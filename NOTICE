@@ -12,5 +12,5 @@ Eight mods here are modified copies of mods shipped with herdr-app
   workspace-chrome-custom  <- workspace-chrome
   new-menu-custom          <- new-menu
 Each of these carries changes from the upstream version; see its RECIPE.md.
-The scheduling design of tools/herdr-tasks (the Tasks scheduler) is ported from
-herdr-automations (MIT), https://github.com/DnzzL/herdr-automations; see tools/herdr-tasks/NOTICE.md.
+The scheduling design of tools/tasks (the Tasks scheduler) is ported from
+herdr-automations (MIT), https://github.com/DnzzL/herdr-automations; see tools/tasks/NOTICE.md.

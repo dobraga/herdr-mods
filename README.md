@@ -19,14 +19,14 @@ cd ~/src/herdr-mods
 
 Mods are symlinked into `~/.config/herdr-app/mods/`, so `git pull` updates them. An existing real folder with the same name is moved to `~/.config/herdr-app/.backups/mods/`.
 
-### The Tasks scheduler (`tools/herdr-tasks`)
+### The Tasks scheduler (`tools/tasks`)
 
 The `tasks` mod is only the panel. Scheduled tasks run in `herdr-tasks`, a small program in this repo (TypeScript on [bun](https://bun.sh)). `./install.sh` links it to `~/.local/bin/herdr-tasks` and installs it as a login service (systemd user unit on Linux, launchd agent on macOS). Without it the panel still lists and runs scripts, but shows "Scheduler stopped" and scheduled tasks never run.
 
 ```sh
 herdr-tasks service status   # is the scheduler running?
 herdr-tasks daemon           # run it by hand, if the service could not be installed
-cd tools/herdr-tasks && bun test
+cd tools/tasks && bun test
 ```
 
 Mods work together through shared state; each recipe lists what it assumes.

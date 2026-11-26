@@ -11,7 +11,7 @@ set -euo pipefail
 
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 home="${HERDR_APP_HOME:-$HOME/.config/herdr-app}"
-tasks_dir="$root/tools/herdr-tasks"
+tasks_dir="$root/tools/tasks"
 
 main() {
   local want_tasks=1 uninstall=0 names=()

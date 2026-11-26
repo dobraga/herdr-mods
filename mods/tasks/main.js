@@ -1,7 +1,7 @@
 // Tasks: define what runs (a script, a shell command or an agent prompt), then run it now or schedule it, per folder.
 //
 // - Scripts are detected in the folder (package.json, Makefile, justfile, pyproject.toml); read-only.
-// - Command and prompt tasks are scheduled and run by one daemon, tools/herdr-tasks (CLI `herdr-tasks`): catch-up after sleep,
+// - Command and prompt tasks are scheduled and run by one daemon, tools/tasks (CLI `herdr-tasks`): catch-up after sleep,
 //   overlap guard, history, pause. Prompts run headless (claude, agy) with a permission level, optionally in a new git worktree.
 // Definitions of commands/prompts are kept in ~/.config/herdr-app/data/tasks/tasks.json (store.js).
 // The panel runs only what you click or schedule; it runs nothing on open.
@@ -21,7 +21,7 @@ const PRESETS = [
   ["Mondays 9:00", "0 9 * * 1"],
   ["Fridays 17:00", "0 17 * * 5"],
 ];
-// Agents the scheduler can run headless (see tools/herdr-tasks/src/agents.ts). Only these are offered for prompts.
+// Agents the scheduler can run headless (see tools/tasks/src/agents.ts). Only these are offered for prompts.
 const HEADLESS_AGENTS = ["claude", "agy"];
 const PERMISSIONS = [["read-only", "Read-only"], ["edit", "Can edit files"], ["full", "Full access"]];
 const PERMISSION_NOTE = {
