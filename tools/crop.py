@@ -21,7 +21,7 @@ logger = logging.getLogger(__name__)
 
 Region = tuple[float, float, float, float]
 
-RIGHT_PANEL: Region = (0.768, 0.05, 1.0, 0.97)
+RIGHT_PANEL: Region = (0.783, 0.05, 0.995, 0.945)
 RIGHT_PANEL_MODS = (
     "changes-tabs",
     "files-tabs",
@@ -31,19 +31,19 @@ RIGHT_PANEL_MODS = (
     "inbox",
 )
 
-REGIONS: dict[str, Region] = {
+REGIONS: dict[str, Region | list[Region]] = {
     **dict.fromkeys(RIGHT_PANEL_MODS, RIGHT_PANEL),
-    "space-folders": (0.0, 0.04, 0.2, 0.62),
-    "agents-custom": (0.0, 0.48, 0.2, 0.75),
-    "workspace-chrome-custom": (0.0, 0.0, 0.2, 0.08),
-    "tabs-folders": (0.13, 0.0, 1.0, 0.05),
-    "workspace-status-usage": (0.13, 0.965, 0.75, 1.0),
-    "file-view": (0.13, 0.05, 0.77, 0.97),
-    "file-picker": (0.25, 0.04, 0.75, 0.6),
-    "new-tab": (0.25, 0.15, 0.75, 0.75),
+    "space-folders": (0.0, 0.04, 0.155, 0.32),
+    "agents-custom": (0.0, 0.49, 0.155, 0.80),
+    "workspace-chrome-custom": [(0.0, 0.0, 0.155, 0.05), (0.0, 0.925, 0.155, 1.0)],
+    "tabs-folders": (0.155, 0.0, 1.0, 0.046),
+    "workspace-status-usage": (0.155, 0.968, 0.84, 1.0),
+    "file-view": (0.158, 0.05, 0.78, 0.96),
+    "file-picker": (0.32, 0.05, 0.68, 0.58),
+    "new-tab": (0.40, 0.34, 0.60, 0.66),
     "new-menu-custom": (0.55, 0.04, 0.8, 0.4),
-    "settings-custom": (0.2, 0.1, 0.8, 0.9),
-    "desktop-toast": (0.55, 0.78, 1.0, 0.97),
+    "settings-custom": (0.235, 0.17, 0.765, 0.83),
+    "desktop-toast": (0.79, 0.85, 0.995, 0.945),
 }
 
 
@@ -63,11 +63,22 @@ def crop_preview(mod: str, shot: Path, dest: Path) -> Path:
     """Crop `shot` to the region of `mod`; save as `dest/mods/<mod>/preview.png`."""
     image = Image.open(shot).convert("RGB")
     width, height = image.size
-    x0, y0, x1, y1 = REGIONS[mod]
+    regions = REGIONS[mod] if isinstance(REGIONS[mod], list) else [REGIONS[mod]]
+    parts = [
+        image.crop(
+            (int(x0 * width), int(y0 * height), int(x1 * width), int(y1 * height))
+        )
+        for x0, y0, x1, y1 in regions
+    ]
+    sheet = Image.new(
+        "RGB", (max(c.width for c in parts), sum(c.height for c in parts))
+    )
+    top = 0
+    for part in parts:
+        sheet.paste(part, (0, top))
+        top += part.height
     out = dest.expanduser() / "mods" / mod / "preview.png"
-    image.crop(
-        (int(x0 * width), int(y0 * height), int(x1 * width), int(y1 * height))
-    ).save(out)
+    sheet.save(out)
     return out
 
 

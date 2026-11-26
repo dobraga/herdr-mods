@@ -47,3 +47,16 @@ uv run --with pytest pytest tests                     # Python tests
 herdr-app check mods/<name>                           # load a mod once
 uv run tools/crop.py <mod> shot.png                   # crop a full-window shot into the mod's preview.png
 ```
+
+### Previews without real data
+
+`tools/demo/` runs Herdr in a throwaway fake home (`/dev/shm/fh`) and its own herdr-core session (`HC_SESSION=demo`), with mock projects, agents, PRs, skills and usage, so previews never show real data:
+
+```sh
+tools/demo/setup.sh      # build the fake home
+tools/demo/run.sh &      # open the demo window
+tools/demo/populate.sh   # mock spaces, tabs and agents
+tools/demo/shoot.sh      # shoot and crop every preview (or: shoot.sh <mod>...)
+```
+
+`new-menu-custom` has no preview yet: it only opens from the tab bar's + button, which needs a click.
