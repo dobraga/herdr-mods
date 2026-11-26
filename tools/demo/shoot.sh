@@ -9,6 +9,14 @@ export HC_SESSION=demo HERDR_APP_HOME="$FH/.config/herdr-app"
 mkdir -p "$OUT"
 
 act() { herdr-app 'do' "$@" > /dev/null; }
+# With ZOOM=2.0 the UI must stay that big for every shot (Herdr can fall back to your own zoom between shots)
+ensure_zoom() {
+  [ -n "${ZOOM:-}" ] || return 0
+  for _ in $(seq 1 30); do
+    herdr-app status | python3 -I -c "import json,sys; sys.exit(0 if json.load(sys.stdin)['zoom'] >= $ZOOM - 0.05 else 1)" && return 0
+    act app.zoom_in; sleep 0.3
+  done
+}
 panel() { act layout.select --stack panel-body --child "$1"; act layout.show --id panel; sleep 2; }
 snap() {
   herdr-app shot "$OUT/$1.png" > /dev/null
@@ -22,6 +30,7 @@ all=(dg-files dg-changes dg-prs dg-loadout dg-tasks dg-inbox dg-tabs dg-spaces d
 mods=("${@:-${all[@]}}")
 
 for mod in "${mods[@]}"; do
+  ensure_zoom
   case "$mod" in
     dg-desktop-toast)
       act space.new --name api-gateway --folder "$FH/web-app" --argv '["codex","blocked"]'; sleep 1; snap "$mod"

@@ -4,7 +4,13 @@
 set -euo pipefail
 FH="${1:-/dev/shm/fh}"
 python3 -I "$(dirname "$0")/usage_server.py" &
-trap 'kill %1 2>/dev/null' EXIT
+pids=($!)
+# The Tasks scheduler, in the fake home, so the Tasks panel does not say "Scheduler stopped"
+if command -v herdr-tasks > /dev/null && command -v bun > /dev/null; then
+  env -i HOME="$FH" PATH="$(dirname "$(command -v bun)"):/usr/bin:/bin" "$(command -v herdr-tasks)" daemon > /dev/null 2>&1 &
+  pids+=($!)
+fi
+trap 'kill "${pids[@]}" 2>/dev/null' EXIT
 env -i HOME="$FH" HC_SESSION=demo HERDR_APP_HOME="$FH/.config/herdr-app" HERDR_TELEMETRY=0 \
   PATH="$FH/.local/bin:$HOME/.local/bin:/usr/local/bin:/usr/bin:/bin" SHELL=/bin/zsh \
   DISPLAY="${DISPLAY:-}" WAYLAND_DISPLAY="${WAYLAND_DISPLAY:-}" XAUTHORITY="${XAUTHORITY:-$HOME/.Xauthority}" \

@@ -4,6 +4,7 @@
 #   ./install.sh                 every mod + herdr-tasks (when bun is installed)
 #   ./install.sh dg-tasks dg-inbox   only these mods (herdr-tasks is installed when `dg-tasks` is among them)
 #   ./install.sh --no-tasks      every mod, without the scheduler
+#   ./install.sh --setup         also link our shared layout (main-folders) and keys, the setup the mods are built for
 #   ./install.sh --uninstall     remove the links (and the herdr-tasks login service)
 #
 # Mods are symlinked, so `git pull` here updates them. HERDR_APP_HOME picks another Herdr home.
@@ -14,10 +15,11 @@ home="${HERDR_APP_HOME:-$HOME/.config/herdr-app}"
 tasks_dir="$root/tools/tasks"
 
 main() {
-  local want_tasks=1 uninstall=0 names=()
+  local want_tasks=1 want_setup=0 uninstall=0 names=()
   for arg in "$@"; do
     case "$arg" in
       --no-tasks) want_tasks=0 ;;
+      --setup) want_setup=1 ;;
       --uninstall) uninstall=1 ;;
       -h | --help) sed -n '2,10p' "$0"; return 0 ;;
       *) names+=("$arg") ;;
@@ -28,6 +30,7 @@ main() {
 
   for name in "${names[@]}"; do link_mod "$name"; done
   if [ "$want_tasks" -eq 1 ] && printf '%s\n' "${names[@]}" | grep -qx dg-tasks; then install_tasks; fi
+  if [ "$want_setup" -eq 1 ]; then install_setup; fi
   echo "Done. Restart Herdr if it does not pick the mods up."
 }
 
@@ -52,6 +55,27 @@ link_mod() {
   echo "  linked $name"
 }
 
+# Our shared layout and keys (setup/). The layout is linked (a real file of yours is backed up);
+# keys are linked only when you have none, otherwise merge setup/keys.json by hand.
+install_setup() {
+  local layout="$home/layouts/main-folders.json"
+  mkdir -p "$home/layouts"
+  if [ -e "$layout" ] && [ ! -L "$layout" ]; then
+    local backup="$home/.backups/layouts/main-folders.json.$(date +%Y%m%d%H%M%S)"
+    mkdir -p "$(dirname "$backup")"
+    mv "$layout" "$backup"
+    echo "  backed up existing $layout -> $backup"
+  fi
+  ln -sfn "$root/setup/main-folders.json" "$layout"
+  echo "  linked layout main-folders (pick it in Settings > Look)"
+  if [ ! -e "$home/keys.json" ]; then
+    ln -s "$root/setup/keys.json" "$home/keys.json"
+    echo "  linked keys.json"
+  else
+    echo "  keys.json already exists: merge $root/setup/keys.json by hand"
+  fi
+}
+
 # The scheduler behind the Tasks panel: bun + a login service (systemd user unit / launchd agent).
 install_tasks() {
   if ! command -v bun > /dev/null 2>&1; then
@@ -69,6 +93,9 @@ uninstall_all() {
   for name in "$@"; do
     [ -L "$home/mods/$name" ] && rm "$home/mods/$name" && echo "  unlinked $name"
   done
+  if [ -L "$home/layouts/main-folders.json" ] && [ "$(readlink "$home/layouts/main-folders.json")" = "$root/setup/main-folders.json" ]; then
+    rm "$home/layouts/main-folders.json" && echo "  unlinked layout main-folders"
+  fi
   # The scheduler goes only when the tasks mod does
   if printf '%s\n' "$@" | grep -qx dg-tasks && [ -x "$tasks_dir/bin/herdr-tasks" ] && command -v bun > /dev/null 2>&1; then
     "$tasks_dir/bin/herdr-tasks" service uninstall || true

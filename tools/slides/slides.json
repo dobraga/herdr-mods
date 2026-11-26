@@ -1,4 +1,102 @@
 {
+  "dg-agents": {
+    "title": "Agents",
+    "lead": "Every running agent, by urgency.",
+    "points": [
+      "Needs you, Done, Working and Idle groups",
+      "Status shown as a badge on the agent icon",
+      "Sub-agents nested under their parent"
+    ],
+    "crop": [
+      0.0,
+      0.5,
+      0.29,
+      0.97
+    ]
+  },
+  "dg-changes": {
+    "title": "Changes",
+    "lead": "Git, without leaving Herdr.",
+    "points": [
+      "Staged and unstaged files with line counts",
+      "Stage, commit, pull and push from the panel",
+      "Every repo of a multi-repo space"
+    ],
+    "crop": [
+      0.585,
+      0.0,
+      1.0,
+      0.895
+    ],
+    "fade": [
+      "left",
+      "bottom"
+    ]
+  },
+  "dg-desktop-toast": {
+    "title": "Toasts",
+    "lead": "Know when an agent needs you, even away.",
+    "points": [
+      "Slim in-app toast with a Copy button",
+      "Desktop notification when Herdr is unfocused",
+      "Blocked and finished agents reach you"
+    ],
+    "crop": [
+      0.62,
+      0.7,
+      0.985,
+      0.9
+    ]
+  },
+  "dg-file-picker": {
+    "title": "Quick Open",
+    "lead": "Jump to any file in a few keystrokes.",
+    "points": [
+      "Fuzzy search across the space's folder",
+      "Type ~ or / to browse any folder",
+      "Enter opens it in a file tab"
+    ],
+    "crop": [
+      0.15,
+      0.05,
+      0.85,
+      0.88
+    ]
+  },
+  "dg-files": {
+    "title": "Files",
+    "lead": "A fast tree for the folder you work in.",
+    "points": [
+      "Single click previews, double click pins",
+      "Material icons and git status letters",
+      "Follows the active file tab"
+    ],
+    "crop": [
+      0.585,
+      0.0,
+      1.0,
+      0.895
+    ],
+    "fade": [
+      "left",
+      "bottom"
+    ]
+  },
+  "dg-file-view": {
+    "title": "File View",
+    "lead": "Every file, shown the right way.",
+    "points": [
+      "Editable code with find",
+      "Rendered Markdown, images, audio and PDF",
+      "Git diffs in one consistent viewer"
+    ],
+    "crop": [
+      0.285,
+      0.09,
+      0.618,
+      0.93
+    ]
+  },
   "dg-inbox": {
     "title": "Inbox",
     "lead": "One list for everything that needs you.",
@@ -17,6 +115,89 @@
       "left"
     ]
   },
+  "dg-loadout": {
+    "title": "Loadout",
+    "lead": "What your AI tools can do, here.",
+    "points": [
+      "Skills, MCP servers and plugins in one list",
+      "Claude, Antigravity, Codex and Gemini",
+      "Filter by scope and open a SKILL.md"
+    ],
+    "crop": [
+      0.585,
+      0.0,
+      1.0,
+      0.895
+    ],
+    "fade": [
+      "left",
+      "bottom"
+    ]
+  },
+  "dg-new-menu": {
+    "title": "New Menu",
+    "lead": "A + menu with only what you have installed.",
+    "points": [
+      "Terminal first, then your agent CLIs",
+      "Press 1-9 to start an agent",
+      "New space and worktree shortcuts"
+    ],
+    "crop": [
+      0.44,
+      0.075,
+      0.625,
+      0.93
+    ]
+  },
+  "dg-new-tab": {
+    "title": "New Tab",
+    "lead": "Open a terminal or an agent in one key.",
+    "points": [
+      "Lists the agent TUIs you actually have",
+      "Pick by number, letter, arrows or click",
+      "Opens in the same space and folder"
+    ],
+    "crop": [
+      0.342,
+      0.255,
+      0.657,
+      0.762
+    ]
+  },
+  "dg-prs": {
+    "title": "Pull Requests",
+    "lead": "GitHub and Bitbucket PRs, all in one panel.",
+    "points": [
+      "CI, review state and diff size on each card",
+      "Your checked-out branch pinned on top",
+      "Detail view with checks and comments"
+    ],
+    "crop": [
+      0.585,
+      0.0,
+      1.0,
+      0.895
+    ],
+    "fade": [
+      "left",
+      "bottom"
+    ]
+  },
+  "dg-settings": {
+    "title": "Settings",
+    "lead": "One dialog for Herdr and every mod.",
+    "points": [
+      "Look, Machines, Alerts and Updates",
+      "GitHub and Bitbucket accounts",
+      "Files, status bar, Tasks and Inbox options"
+    ],
+    "crop": [
+      0.24,
+      0.158,
+      0.76,
+      0.842
+    ]
+  },
   "dg-spaces": {
     "title": "Spaces",
     "lead": "Your spaces, grouped in colored folders.",
@@ -30,6 +211,76 @@
       0.0,
       0.607,
       0.985
+    ],
+    "fade": [
+      "right"
+    ]
+  },
+  "dg-tabs": {
+    "title": "Tabs",
+    "lead": "A tab bar that knows your agents.",
+    "points": [
+      "Colored border when an agent is blocked",
+      "Side-panel buttons with live badges",
+      "Drag a tab to split the view"
+    ],
+    "crop": [
+      0.28,
+      0.0,
+      0.82,
+      0.3
+    ],
+    "fade": [
+      "right"
+    ]
+  },
+  "dg-tasks": {
+    "title": "Tasks",
+    "lead": "Run and schedule what your project needs.",
+    "points": [
+      "npm, make, just and pyproject scripts found for you",
+      "Saved commands, prompts and chained sets",
+      "Cron schedules with run history"
+    ],
+    "crop": [
+      0.585,
+      0.0,
+      1.0,
+      0.895
+    ],
+    "fade": [
+      "left",
+      "bottom"
+    ]
+  },
+  "dg-workspace-chrome": {
+    "title": "Sidebar Chrome",
+    "lead": "A clean frame for the Herdr sidebar.",
+    "points": [
+      "Logo, search and a collapse toggle",
+      "Collapses to a narrow icon rail",
+      "Settings opens the full dg-settings dialog"
+    ],
+    "crop": [
+      0.0,
+      0.0,
+      0.29,
+      0.99
+    ]
+  },
+  "dg-workspace-status": {
+    "title": "Status Bar",
+    "lead": "Your workspace at a glance.",
+    "points": [
+      "Branch, PR chip and CI state",
+      "Claude and Antigravity usage rings",
+      "Live CPU, memory, disk and network"
+    ],
+    "crop": [
+      0.28,
+      0.935,
+      0.7,
+      1.0
     ],
     "fade": [
       "right"

@@ -83,6 +83,7 @@ def _fill(template: str, mod: str, slide: dict, image: Path) -> str:
     values = {
         "name": mod,
         "title": escape(slide["title"]),
+        "tsize": str(_title_size(slide["title"])),
         "lead": escape(slide["lead"]),
         "points": points,
         "image": f"file://{image}",
@@ -91,6 +92,11 @@ def _fill(template: str, mod: str, slide: dict, image: Path) -> str:
     for key, value in values.items():
         template = template.replace("{{" + key + "}}", value)
     return template
+
+
+def _title_size(title: str) -> int:
+    """Big titles for short names, smaller for long ones so they stay on one line."""
+    return 150 if len(title) <= 8 else 128 if len(title) <= 11 else 104
 
 
 def _mask(edges: list[str]) -> str:

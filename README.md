@@ -33,6 +33,16 @@ cd ~/src/herdr-mods
 
 Mods (`<name>/mods/<name>/`) are symlinked into `~/.config/herdr-app/mods/`, so `git pull` updates them. An existing real folder with the same name is moved to `~/.config/herdr-app/.backups/mods/`.
 
+### The shared setup (`setup/`)
+
+The mods are built for our layout, `main-folders`: folders in the sidebar, a tab bar with the Files, Changes, PRs, Loadout, Tasks and Inbox panels, a status bar. `setup/` holds that layout and the keys that go with it.
+
+```sh
+./install.sh --setup    # also links the layout and, if you have none, keys.json
+```
+
+Then pick `main-folders` in Settings > Look. If you already have a `keys.json`, merge `setup/keys.json` into it by hand. The files are owned by the dotfiles repo and copied here by `tools/sync-setup.sh`.
+
 ### The Tasks scheduler (`tools/tasks`)
 
 The `dg-tasks` mod is only the panel. Scheduled tasks run in `herdr-tasks`, a small program in this repo (TypeScript on [bun](https://bun.sh)). `./install.sh` links it to `~/.local/bin/herdr-tasks` and installs it as a login service (systemd user unit on Linux, launchd agent on macOS). Without it the panel still lists and runs scripts, but shows "Scheduler stopped" and scheduled tasks never run.
