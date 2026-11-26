@@ -1756,6 +1756,26 @@ export default class FileView extends View {
   }
 
   // Blocks are rendered lazily (only the visible ones) so a huge markdown file doesn't lay out whole.
+  // The finished render of a ```mermaid block, or null (not a diagram, still rendering, or failed).
+  mermaidReady(block) {
+    const code = mermaidCode(block);
+    if (code === null || !this.mermaidCache) return null;
+    const t = theme();
+    const colors = {};
+    for (const k of ["background", "foreground", "border", "muted", "chrome", "raised"]) if (typeof t[k] === "string") colors[k] = t[k];
+    const entry = this.mermaidCache.get(`${JSON.stringify(colors)}|${code}`);
+    return entry?.state === "ok" ? entry : null;
+  }
+
+  openMermaidZoom(entry, cx) {
+    this.mermaidZoom = { relPath: entry.relPath, width: entry.width, height: entry.height };
+    this.savedMediaData = this.mediaData;
+    this.mediaData = this.mermaidZoom;
+    this.imgFit = true;
+    this.imgZoom = 1;
+    cx.notify();
+  }
+
   // A ```mermaid block draws as a rendered PNG (mmdc, cached by hash); until it is ready, or if it
   // fails, the block stays as code with the error underneath.
   renderMdBlock(block, i, cx) {
@@ -1833,7 +1853,12 @@ export default class FileView extends View {
           id,
           blocks.length,
           (i) => `${i}`,
-          (i) => div().px(20).py(6).child(this.renderMdBlock(blocks[i], i, cx)),
+          (i) => {
+            let row = div().px(20).py(6);
+            const ready = this.mermaidReady(blocks[i]);
+            if (ready) row = row.id(`fv-mmd-${this.slotId}-${i}`).cursor_pointer().on_click((_e, cx) => this.openMermaidZoom(ready, cx));
+            return row.child(this.renderMdBlock(blocks[i], i, cx));
+          },
         ).size_full(),
       )
       .child(Scrollbar.vertical(id).absolute().inset_0());
