@@ -12,7 +12,7 @@ act() { herdr-app 'do' "$@" > /dev/null; }
 panel() { act layout.select --stack panel-body --child "$1"; act layout.show --id panel; sleep 2; }
 snap() {
   herdr-app shot "$OUT/$1.png" > /dev/null
-  uv run "$repo/tools/crop.py" "$1" "$OUT/$1.png" --dest "$repo" > /dev/null
+  [ -n "${NOCROP:-}" ] || uv run "$repo/tools/crop.py" "$1" "$OUT/$1.png" --dest "$repo" > /dev/null
   echo "ok $1"
 }
 

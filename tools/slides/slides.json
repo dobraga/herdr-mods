@@ -1,0 +1,38 @@
+{
+  "dg-inbox": {
+    "title": "Inbox",
+    "lead": "One list for everything that needs you.",
+    "points": [
+      "Answer agent questions in one click",
+      "CI and review alerts from your pull requests",
+      "Scheduled task runs, ranked by urgency"
+    ],
+    "crop": [
+      0.585,
+      0.0,
+      1.0,
+      0.895
+    ],
+    "fade": [
+      "left"
+    ]
+  },
+  "dg-spaces": {
+    "title": "Spaces",
+    "lead": "Your spaces, grouped in colored folders.",
+    "points": [
+      "Folders and profiles for every project",
+      "Agent status on each tab, at a glance",
+      "Next and previous space by on-screen order"
+    ],
+    "crop": [
+      0.0,
+      0.0,
+      0.607,
+      0.985
+    ],
+    "fade": [
+      "right"
+    ]
+  }
+}

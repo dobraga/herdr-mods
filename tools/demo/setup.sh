@@ -11,6 +11,8 @@ mkdir -p "$FH/.config/herdr-app/layouts" "$FH/.config/herdr-app/mods" "$FH/.loca
 
 # Herdr config: layout, keys, mods (a copy, so the demo can stub network helpers)
 cp "$real_home/src/dotfiles/herdr-app/"{keys.json,settings.json} "$FH/.config/herdr-app/"
+# ZOOM=2.0 ./setup.sh: a bigger UI, for crisp shots of a small panel on a slide (default: your own zoom)
+[ -n "${ZOOM:-}" ] && sed -i "s/\"zoom\": *[0-9.]*/\"zoom\": $ZOOM/" "$FH/.config/herdr-app/settings.json"
 cp "$real_home/src/dotfiles/herdr-app/layouts/main-folders.json" "$FH/.config/herdr-app/layouts/"
 cp -r "$repo"/*/mods/* "$FH/.config/herdr-app/mods/"
 ln -s "$real_home/.local/share/fonts" "$FH/.local/share/fonts" 2>/dev/null || true

@@ -36,5 +36,5 @@ test("discoverRepoRoots finds sibling repos from the scaffold root", async () =>
 
 test("repoName and slug", () => {
   expect(repoName("/s/api/")).toBe("api");
-  expect(normalizeRemoteSlug("git@github.com:Hotmart-Org/api-persona-bff.git")).toBe("github:hotmart-org/api-persona-bff");
+  expect(normalizeRemoteSlug("git@github.com:Acme-Org/api-server.git")).toBe("github:acme-org/api-server");
 });
