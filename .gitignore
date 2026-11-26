@@ -1,0 +1,7 @@
+gpui-kit.d.ts
+jsconfig.json
+.complexipy_cache/
+.ruff_cache/
+__pycache__/
+*.pyc
+node_modules/

@@ -1,0 +1,16 @@
+herdr-mods
+Mods for Herdr (https://herdr.dev).
+
+Eight mods here are modified copies of mods shipped with herdr-app
+(https://github.com/herdrdev/herdr-app, Apache License 2.0). Changed from upstream:
+  agents-custom            <- agents
+  changes-tabs             <- changes
+  files-tabs               <- files
+  space-folders            <- spaces
+  tabs-folders             <- tabs
+  workspace-status-usage   <- workspace-status
+  workspace-chrome-custom  <- workspace-chrome
+  new-menu-custom          <- new-menu
+Each of these carries changes from the upstream version; see its RECIPE.md.
+The scheduling design behind the `tasks` mod's companion tool is ported from
+herdr-automations (MIT), https://github.com/DnzzL/herdr-automations.
