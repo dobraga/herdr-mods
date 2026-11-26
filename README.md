@@ -29,6 +29,16 @@ Eight are modified forks of Herdr's own mods (Apache-2.0, see [NOTICE](NOTICE)).
 
 License: Apache-2.0.
 
+## Keeping forks in sync
+
+Eight mods are forks of mods shipped with Herdr (`forks.json`). After a Herdr update:
+
+```sh
+tools/check-forks.sh                 # lists forks whose upstream mod changed
+# diff ~/.config/herdr-app/mods/<upstream>/main.js against mods/<fork>/main.js, merge, then:
+tools/check-forks.sh --sync <fork>   # or: --sync all
+```
+
 ## Development
 
 ```sh
