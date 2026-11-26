@@ -35,14 +35,14 @@ REGIONS: dict[str, Region | list[Region]] = {
     **dict.fromkeys(RIGHT_PANEL_MODS, RIGHT_PANEL),
     "space-folders": (0.0, 0.04, 0.155, 0.32),
     "agents-custom": (0.0, 0.49, 0.155, 0.80),
-    "workspace-chrome-custom": [(0.0, 0.0, 0.155, 0.05), (0.0, 0.925, 0.155, 1.0)],
+    "workspace-chrome-custom": [(0.0, 0.0, 0.152, 0.05), (0.0, 0.93, 0.152, 0.995)],
     "tabs-folders": (0.155, 0.0, 1.0, 0.046),
     "workspace-status-usage": (0.155, 0.968, 0.84, 1.0),
     "file-view": (0.158, 0.05, 0.78, 0.96),
     "file-picker": (0.32, 0.05, 0.68, 0.58),
     "new-tab": (0.40, 0.34, 0.60, 0.66),
-    "new-menu-custom": (0.55, 0.04, 0.8, 0.4),
-    "settings-custom": (0.235, 0.17, 0.765, 0.83),
+    "new-menu-custom": (0.47, 0.052, 0.78, 0.405),
+    "settings-custom": (0.24, 0.158, 0.76, 0.842),
     "desktop-toast": (0.79, 0.85, 0.995, 0.945),
 }
 

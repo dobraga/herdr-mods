@@ -59,4 +59,3 @@ tools/demo/populate.sh   # mock spaces, tabs and agents
 tools/demo/shoot.sh      # shoot and crop every preview (or: shoot.sh <mod>...)
 ```
 
-`new-menu-custom` has no preview yet: it only opens from the tab bar's + button, which needs a click.

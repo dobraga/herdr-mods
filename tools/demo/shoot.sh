@@ -17,7 +17,7 @@ snap() {
 }
 
 all=(desktop-toast files-tabs changes-tabs prs-panel loadout tasks inbox tabs-folders space-folders agents-custom
-  workspace-chrome-custom workspace-status-usage file-view file-picker new-tab settings-custom)
+  workspace-chrome-custom workspace-status-usage file-view file-picker new-tab settings-custom new-menu-custom)
 mods=("${@:-${all[@]}}")
 
 for mod in "${mods[@]}"; do
@@ -35,8 +35,10 @@ for mod in "${mods[@]}"; do
         "{\"slotId\":\"demo-$(date +%s)\",\"kind\":\"file\",\"path\":\"README.md\",\"root\":\"$FH/acme-api\",\"name\":\"README.md\",\"preview\":false,\"updatedAt\":$(date +%s%3N)}"
       sleep 2; snap "$mod"; act tab.close ;;
     file-picker | new-tab | settings-custom)
-      if [ "$mod" = settings-custom ]; then act app.settings; else act mod.open --name "$mod"; fi
+      act mod.open --name "$mod"
       sleep 2; snap "$mod"; act overlay.close ;;
+    new-menu-custom)  # opened by the tab bar's + as a popup; as a pane it shows the same menu
+      act pane.split --direction right --mod new-menu-custom; sleep 2; snap "$mod"; act pane.close ;;
     *) echo "unknown mod $mod" >&2; exit 1 ;;
   esac
 done
