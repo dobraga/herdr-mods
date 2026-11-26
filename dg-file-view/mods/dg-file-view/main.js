@@ -1767,9 +1767,19 @@ export default class FileView extends View {
     return entry?.state === "ok" ? entry : null;
   }
 
-  openMermaidZoom(entry, cx) {
-    this.mermaidZoom = { relPath: entry.relPath, width: entry.width, height: entry.height };
-    this.savedMediaData = this.mediaData;
+  readyDiagrams() {
+    return (this.mdBlocks || []).map((b) => this.mermaidReady(b)).filter(Boolean);
+  }
+
+  // Zoom opens from the toolbar, not from the list: an interactive element inside a list row made
+  // the diagram disappear.
+  showMermaid(idx, cx) {
+    const list = this.readyDiagrams();
+    if (!list.length) return;
+    const n = ((idx % list.length) + list.length) % list.length;
+    if (!this.mermaidZoom) this.savedMediaData = this.mediaData;
+    this.mermaidIdx = n;
+    this.mermaidZoom = { relPath: list[n].relPath, width: list[n].width, height: list[n].height };
     this.mediaData = this.mermaidZoom;
     this.imgFit = true;
     this.imgZoom = 1;
@@ -1834,7 +1844,10 @@ export default class FileView extends View {
             .gap(8)
             .border_b(1)
             .border_color(t.border)
-            .child(pillBtn("fv-mmd-back", "← Back to document", false, t, (_e, cx) => this.closeMermaidZoom(cx))),
+            .child(pillBtn("fv-mmd-back", "← Back to document", false, t, (_e, cx) => this.closeMermaidZoom(cx)))
+            .child(pillBtn("fv-mmd-prev", "‹ Prev", false, t, (_e, cx) => this.showMermaid((this.mermaidIdx ?? 0) - 1, cx)))
+            .child(pillBtn("fv-mmd-next", "Next ›", false, t, (_e, cx) => this.showMermaid((this.mermaidIdx ?? 0) + 1, cx)))
+            .child(div().text_size(11.5).text_color(t.muted).child(`${(this.mermaidIdx ?? 0) + 1} / ${this.readyDiagrams().length}`)),
         )
         .child(renderImageView(this, slot, fullPath, t));
     }
@@ -1853,12 +1866,7 @@ export default class FileView extends View {
           id,
           blocks.length,
           (i) => `${i}`,
-          (i) => {
-            let row = div().px(20).py(6);
-            const ready = this.mermaidReady(blocks[i]);
-            if (ready) row = row.id(`fv-mmd-${this.slotId}-${i}`).cursor_pointer().on_click((_e, cx) => this.openMermaidZoom(ready, cx));
-            return row.child(this.renderMdBlock(blocks[i], i, cx));
-          },
+          (i) => div().px(20).py(6).child(this.renderMdBlock(blocks[i], i, cx)),
         ).size_full(),
       )
       .child(Scrollbar.vertical(id).absolute().inset_0());
@@ -2281,7 +2289,10 @@ export default class FileView extends View {
                 .border(1)
                 .border_color(t.border)
                 .child(chip("fv-md-code", "Code", !this.mdPreview, (_e, cx) => { this.mdPreview = false; cx.notify(); }))
-                .child(chip("fv-md-prev", "Preview", this.mdPreview, (_e, cx) => { this.mdPreview = true; cx.notify(); })),
+                .child(chip("fv-md-prev", "Preview", this.mdPreview, (_e, cx) => { this.mdPreview = true; cx.notify(); }))
+                .when(this.mdPreview && this.readyDiagrams().length > 0, (g) =>
+                  g.child(chip("fv-md-zoom", "Diagrams", Boolean(this.mermaidZoom), (_e, cx) => this.showMermaid(this.mermaidIdx ?? 0, cx))),
+                ),
             ),
           )
           .when(isSvg, (el) =>
