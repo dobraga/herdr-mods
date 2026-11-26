@@ -26,7 +26,8 @@ for mod in "${mods[@]}"; do
       act space.new --name api-gateway --folder "$FH/web-app" --argv '["codex","blocked"]'; sleep 1; snap "$mod"
       act space.select --index 1 ;;
     files-tabs | changes-tabs | prs-panel | loadout | tasks | inbox)
-      child="${mod%-tabs}"; panel "${child%-panel}"; snap "$mod" ;;
+      child="${mod%-tabs}"; panel "${child%-panel}"; [ "$mod" = inbox ] && sleep "${INBOX_WAIT:-45}"  # PR alerts need a second sync
+      snap "$mod" ;;
     tabs-folders | space-folders | agents-custom | workspace-chrome-custom | workspace-status-usage)
       panel files; snap "$mod" ;;
     file-view)

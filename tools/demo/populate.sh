@@ -8,7 +8,7 @@ do_() { herdr-app 'do' "$@" > /dev/null; }
 do_ space.new --name acme-api --folder "$FH/acme-api"
 do_ tab.new --name claude --folder "$FH/acme-api" --argv '["claude","working"]'
 do_ tab.new --name pi --folder "$FH/acme-api" --argv '["pi","idle"]'
-do_ space.new --name web-app --folder "$FH/web-app" --argv '["codex","blocked"]'
+do_ space.new --name web-app --folder "$FH/web-app" --argv '["claude","blocked","ask"]'
 do_ space.new --name docs-site --folder "$FH/docs-site" --argv '["claude","done"]'
 sleep 3
 

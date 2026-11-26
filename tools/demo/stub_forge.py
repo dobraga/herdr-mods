@@ -21,9 +21,15 @@ MOCK = """    del env
             "additions": add, "deletions": dele, "changedFiles": files,
         }
 
+    # The first sync is quiet; later ones flip PR #41 to failing CI and #42 to a new approval, which raises
+    # the PR notifications the Inbox lists.
+    calls = Path.home() / ".forge-demo-calls"
+    n = int(calls.read_text()) if calls.exists() else 0
+    calls.write_text(str(n + 1))
+    later = n >= 1
     return [
-        _pr(42, "Add greeting endpoint", "acme-api", "feat/greeting", "success", "approved", True, appr=2, hrs=2),
-        _pr(41, "Fix pagination off-by-one", "web-app", "fix/pagination", "failure", "changes_requested", True, hrs=5),
+        _pr(42, "Add greeting endpoint", "acme-api", "feat/greeting", "success", "approved" if later else "none", True, appr=2 if later else 0, hrs=2),
+        _pr(41, "Fix pagination off-by-one", "web-app", "fix/pagination", "failure" if later else "pending", "changes_requested", True, hrs=5),
         _pr(40, "Draft: dark mode tokens", "web-app", "feat/dark-mode", "pending", "none", True, draft=True, hrs=9),
         _pr(39, "Upgrade dependencies", "docs-site", "chore/deps", "success", "none", False, hrs=20, files=2),
     ], None

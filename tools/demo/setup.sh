@@ -21,11 +21,35 @@ export PATH="\$HOME/.local/bin:$real_home/.local/bin:/usr/local/bin:/usr/bin:/bi
 ZSH
 echo "PROMPT='%F{blue}%~%f ❯ '" > "$FH/.zshrc"
 # Fake agent CLIs: report a status through OSC 7501 (usage: claude working | codex blocked | pi idle | claude done)
+# `claude blocked ask` also shows a question dialog, which the Inbox turns into an ask card.
 for a in claude codex pi; do
   cat > "$FH/.local/bin/$a" <<'AGENT'
 #!/bin/sh
 app=$(basename "$0"); state=${1:-idle}
-printf 'demo %s agent (%s)\n' "$app" "$state"
+[ "$app" = claude ] && app=claude-code
+if [ "${2:-}" = ask ]; then
+  i=0; while [ $i -lt 45 ]; do echo; i=$((i + 1)); done
+  cat <<'DIALOG'
+───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+ ☐ Release notes
+
+│ Which format should the release notes use?
+
+  1. Keep a Changelog (Recommended)
+     Group entries under Added, Changed and Fixed.
+  2. Plain list
+     One bullet per merged PR.
+  3. Skip for now
+     Do not write release notes yet.
+❯ 4. Type something.
+───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  5. Chat about this
+
+Enter to select · ↑/↓ to navigate · Esc to cancel
+DIALOG
+else
+  printf 'demo %s agent (%s)\n' "$app" "$state"
+fi
 while true; do printf '\033]7501;state=%s:app=%s\033\\' "$state" "$app"; sleep 0.5; done
 AGENT
   chmod +x "$FH/.local/bin/$a"
@@ -98,6 +122,6 @@ echo '{"claudeAiOauth":{"accessToken":"demo-token","subscriptionType":"pro","exp
 sed -i 's#https://api.anthropic.com/api/oauth/usage#http://127.0.0.1:8799/usage#' "$FH/.config/herdr-app/mods/workspace-status-usage/main.js"
 
 # Mock PRs (GitHub profile "personal"): the helper's network call is stubbed in the demo copy
-echo '{"profiles":{"personal":{"github":{"enabled":true,"account":"octocat"}}}}' > "$FH/.config/herdr-forge.json"
+echo '{"pollIntervalSec":30,"profiles":{"personal":{"github":{"enabled":true,"account":"octocat"}}}}' > "$FH/.config/herdr-forge.json"
 python3 -I "$repo/tools/demo/stub_forge.py" "$FH/.config/herdr-app/mods/prs-panel/forge-helper.py"
 echo "fake home ready: $FH"
