@@ -2,7 +2,32 @@
 
 Mods for [Herdr](https://herdr.dev), each in its own folder under `mods/` with a `RECIPE.md` (a brief an agent can rebuild it from) and a `preview.png`.
 
-Install one by asking your Herdr agent to add `herdr.dev/mods/dobraga/<name>`. It reads the recipe and every file first, and tells you if a mod reaches the network or runs programs.
+## Install
+
+Ask your Herdr agent to add `herdr.dev/mods/dobraga/<name>`: it reads the recipe and every file first, and tells you if a mod reaches the network or runs programs.
+
+Or clone the repo and link the mods yourself:
+
+```sh
+git clone https://github.com/dobraga/herdr-mods.git ~/src/herdr-mods
+cd ~/src/herdr-mods
+./install.sh                 # every mod, plus the Tasks scheduler (needs bun)
+./install.sh inbox prs-panel # only some mods
+./install.sh --no-tasks      # every mod, without the scheduler
+./install.sh --uninstall     # remove the links and the scheduler service
+```
+
+Mods are symlinked into `~/.config/herdr-app/mods/`, so `git pull` updates them. An existing real folder with the same name is moved to `~/.config/herdr-app/.backups/mods/`.
+
+### The Tasks scheduler (`tools/herdr-tasks`)
+
+The `tasks` mod is only the panel. Scheduled tasks run in `herdr-tasks`, a small program in this repo (TypeScript on [bun](https://bun.sh)). `./install.sh` links it to `~/.local/bin/herdr-tasks` and installs it as a login service (systemd user unit on Linux, launchd agent on macOS). Without it the panel still lists and runs scripts, but shows "Scheduler stopped" and scheduled tasks never run.
+
+```sh
+herdr-tasks service status   # is the scheduler running?
+herdr-tasks daemon           # run it by hand, if the service could not be installed
+cd tools/herdr-tasks && bun test
+```
 
 Mods work together through shared state; each recipe lists what it assumes.
 Eight are modified forks of Herdr's own mods (Apache-2.0, see [NOTICE](NOTICE)).
