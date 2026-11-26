@@ -33,15 +33,15 @@ cd ~/src/herdr-mods
 
 Mods (`<name>/mods/<name>/`) are symlinked into `~/.config/herdr-app/mods/`, so `git pull` updates them. An existing real folder with the same name is moved to `~/.config/herdr-app/.backups/mods/`.
 
-### The shared setup (`setup/`)
+### The layout (`dg-main-folders/`)
 
-The mods are built for our layout, `main-folders`: folders in the sidebar, a tab bar with the Files, Changes, PRs, Loadout, Tasks and Inbox panels, a status bar. `setup/` holds that layout and the keys that go with it.
+The mods are built for our layout, [dg-main-folders](dg-main-folders/README.md): folders in the sidebar, a tab bar with the Files, Changes, PRs, Loadout, Tasks and Inbox panels, and a status bar.
 
 ```sh
-./install.sh --setup    # also links the layout and, if you have none, keys.json
+./install.sh --setup    # also links the layout and, if you have none, its keys.json
 ```
 
-Then pick `main-folders` in Settings > Look. If you already have a `keys.json`, merge `setup/keys.json` into it by hand. The files are owned by the dotfiles repo and copied here by `tools/sync-setup.sh`.
+Then pick `dg-main-folders` in Settings > Look. If you already have a `keys.json`, merge `dg-main-folders/keys.json` into it by hand. `setup/` and `tools/sync-layout.sh` keep that folder in step with the dotfiles repo, which owns the layout.
 
 ### The Tasks scheduler (`tools/tasks`)
 

@@ -107,6 +107,9 @@ for p in web-app docs-site; do
   git remote add origin "https://github.com/acme/$p.git"
 done
 
+# No "Updated to..." toast in shots
+echo '{"last_run":"0.1.18","presented":["0.1.17"]}' > "$FH/.config/herdr-app/update-notes.json"
+
 # First-run state: no welcome dialog, our layout, a big window
 echo '{"layout":"main-folders","frame.welcomed":"finished","workspace.panels":["files","changes"]}' > "$FH/.config/herdr-app/shared.json"
 echo '{"state":"maximized","bounds":[0.0,0.0,1920.0,1032.0],"display":"00000000-0000-0000-0000-000000000000"}' > "$FH/.config/herdr-app/window.json"

@@ -31,6 +31,8 @@ mods=("${@:-${all[@]}}")
 
 for mod in "${mods[@]}"; do
   ensure_zoom
+  # a known state for every shot: the first space shown
+  case "$mod" in dg-desktop-toast) ;; *) act space.select --index 1 ;; esac
   case "$mod" in
     dg-desktop-toast)
       act space.new --name api-gateway --folder "$FH/web-app" --argv '["codex","blocked"]'; sleep 1; snap "$mod"
@@ -47,6 +49,8 @@ for mod in "${mods[@]}"; do
     dg-file-picker | dg-new-tab | dg-settings)
       act mod.open --name "$mod"
       sleep 2; snap "$mod"; act overlay.close ;;
+    dg-main-folders)  # the whole layout, with the Inbox panel open
+      panel inbox; sleep "${INBOX_WAIT:-45}"; snap "$mod" ;;
     dg-new-menu)  # opened by the tab bar's + as a popup; as a pane it shows the same menu
       act pane.split --direction right --mod dg-new-menu; sleep 2; snap "$mod"; act pane.close ;;
     *) echo "unknown mod $mod" >&2; exit 1 ;;

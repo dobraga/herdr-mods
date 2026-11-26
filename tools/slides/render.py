@@ -48,7 +48,14 @@ def render(mod: str, slide: dict) -> Path:
         crop = Path(tmp) / "crop.png"
         _crop(shots / f"{mod}.png", slide["crop"]).save(crop)
         html = Path(tmp) / "slide.html"
-        html.write_text(_fill((HERE / "template.html").read_text(), mod, slide, crop))
+        html.write_text(
+            _fill(
+                (HERE / slide.get("template", "template.html")).read_text(),
+                mod,
+                slide,
+                crop,
+            )
+        )
         out = REPO / mod / "preview.png"
         subprocess.run(
             [
@@ -68,11 +75,27 @@ def render(mod: str, slide: dict) -> Path:
     return out
 
 
-def _crop(shot: Path, box: list[float]) -> Image.Image:
+def _crop(shot: Path, box: list) -> Image.Image:
+    """Crop one box, or several boxes (a list of boxes) stacked top to bottom at the widest width."""
     image = Image.open(shot).convert("RGB")
     w, h = image.size
-    x0, y0, x1, y1 = box
-    return image.crop((int(x0 * w), int(y0 * h), int(x1 * w), int(y1 * h)))
+    boxes = box if isinstance(box[0], list) else [box]
+    parts = [
+        image.crop((int(x0 * w), int(y0 * h), int(x1 * w), int(y1 * h)))
+        for x0, y0, x1, y1 in boxes
+    ]
+    scale = 1700 / max(part.width for part in parts) if len(parts) > 1 else 1
+    parts = [
+        part.resize((round(part.width * scale), round(part.height * scale)), Image.LANCZOS)
+        for part in parts
+    ]
+    width = max(part.width for part in parts)
+    out = Image.new("RGB", (width, sum(part.height for part in parts)))
+    y = 0
+    for part in parts:
+        out.paste(part, (0, y))
+        y += part.height
+    return out
 
 
 def _fill(template: str, mod: str, slide: dict, image: Path) -> str:

@@ -1,8 +1,8 @@
-# Main Folders
+# dg-main-folders
 
 A Herdr layout built on the shipped `main` layout: a spaces and agents sidebar on the left, a tab bar over the terminals, a stacked tool panel on the right (files, changes, PRs, loadout, tasks, inbox) and a status bar at the bottom. Everything except the brand header, the pane header and the new-chat menu comes from the `dg-*` mods in this repo.
 
-![Main Folders](preview.png)
+![dg-main-folders](preview.png)
 
 ## What you see
 
@@ -23,19 +23,20 @@ A Herdr layout built on the shipped `main` layout: a spaces and agents sidebar o
 
 - Agent status (working, blocked, done, idle) shows in the agents list and the status bar through `dg-agents` and `dg-workspace-status`; `dg-inbox` collects questions and notifications and `dg-desktop-toast` raises desktop notifications.
 - Each tool panel mod follows the focused pane's folder, so every space shows its own files, changes and PRs.
-- `ctrl-shift-b` runs `layout.toggle:sidebar` in the author's `keys.json` (not part of this folder; add it if you want it).
+- The keys that go with it are in `keys.json` (for example `ctrl-p` Quick Open, `ctrl-t` new tab, `ctrl-,` Settings, `alt-up` / `alt-down` next and previous space). Merge them into yours.
 - The sidebar cannot be dragged to resize (`resizable: false`); the panel can (280 to 900px).
 
 ## Built from
 
-- Layout file: `layouts/main-folders.json` (`cloned_from` shipped `main` 0.1.10).
-- Shipped mods: `workspace-chrome`, `pane`, `new-chat`.
-- Mods from this repo (each has its own `RECIPE.md` in `../<name>/`): `dg-spaces`, `dg-agents`, `dg-workspace-chrome`, `dg-tabs`, `dg-files`, `dg-changes`, `dg-prs`, `dg-loadout`, `dg-tasks`, `dg-inbox`, `dg-workspace-status`, `dg-desktop-toast`. `dg-files` also needs `dg-file-view` to open files.
+- Layout file: `layouts/dg-main-folders.json` (`cloned_from` shipped `main` 0.1.10). Its keys are in `keys.json`, under `layout:dg-main-folders`.
+- Shipped mods: `workspace-chrome` and `pane`. `new-chat` and `chat-menu` come from [herdr-chat](https://github.com/dobraga/herdr-chat) (the floating new-chat block and the terminal menu).
+- `mods/` in this folder holds a copy of every `dg-*` mod the layout uses (`tools/sync-layout.sh` refreshes it from the mod folders of the repo).
+- Mods from this repo (each has its own `RECIPE.md` in `../<name>/`): `dg-spaces`, `dg-agents`, `dg-workspace-chrome`, `dg-tabs`, `dg-files`, `dg-changes`, `dg-prs`, `dg-loadout`, `dg-tasks`, `dg-inbox`, `dg-workspace-status`, `dg-desktop-toast`. Opening files needs `dg-file-view`, Quick Open `dg-file-picker`, the + buttons `dg-new-tab` and `dg-new-menu`, and the Settings rows `dg-settings`.
 - Nodes: root row, `sidebar` column (`brand`, `sidebar-lists` column, `sidebar-footer`), `work` column (`tabs`, `work-body` row of `main` + `panel` column with a `panel-body` stack, `status`).
 
 ## Watch out
 
-- The layout references mods by name: the `dg-*` folders must exist in `~/.config/herdr-app/mods/` before switching, or the blocks stay empty.
+- The layout references mods by name: the `dg-*` folders must exist in `~/.config/herdr-app/mods/` before switching, or Herdr shows its own layout and says which mods are missing. `new-chat` (herdr-chat) counts: without it the layout does not load.
 - `dg-prs` runs `gh`/`git` and `dg-tasks` runs a background service; read their recipes before adding.
 - The stack has no built-in switcher: the `dg-*` panel mods and the author's keys choose which block is visible.
 - Written against Herdr 0.1.10 layouts.
@@ -43,5 +44,5 @@ A Herdr layout built on the shipped `main` layout: a spaces and agents sidebar o
 ## Done when
 
 - `herdr-app check` passes for every `dg-*` mod and `layout.error` is empty after the layout is copied to `layouts/`.
-- `layout.switch {name: "main-folders"}` shows the sidebar, tab bar, panel and status bar described above.
+- `layout.switch {name: "dg-main-folders"}` shows the sidebar, tab bar, panel and status bar described above.
 - Focusing a terminal in another repo changes what the files and changes panels list.

@@ -43,6 +43,7 @@ REGIONS: dict[str, Region | list[Region]] = {
     "dg-new-tab": (0.40, 0.34, 0.60, 0.66),
     "dg-new-menu": (0.47, 0.052, 0.78, 0.405),
     "dg-settings": (0.24, 0.158, 0.76, 0.842),
+    "dg-main-folders": (0.0, 0.0, 1.0, 1.0),
     "dg-desktop-toast": (0.79, 0.85, 0.995, 0.945),
 }
 
