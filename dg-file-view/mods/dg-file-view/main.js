@@ -1,5 +1,5 @@
 // Fast file editor, media previewer (image/SVG/audio/video), git diff viewer, and inline Open With screen.
-import { View, div, svg, list } from "gpui-kit";
+import { View, div, svg, list, image } from "gpui-kit";
 import { v_flex, h_flex, Editor, EditorState, TextView, Scrollbar, v_virtual_list, Input, InputState, SliderState, ScrollHandle, VirtualListScrollHandle } from "gpui-base";
 import { props, shared, setShared, spaces, panes, focused, run, exec, readTextFile, writeTextFile, watchFolder, theme, settings, home, checking, notify } from "herdr";
 import { colorRows } from "./syntax.js";
@@ -7,6 +7,7 @@ import { inspectFile, launchApp, setDefaultApp, revealInFolder, visibleApps, ren
 import {
   AUDIO_RATES,
   loadImagePreview,
+  loadMermaid,
   loadAudioPreview,
   loadVideoPreview,
   extractVideoFrame,
@@ -16,6 +17,7 @@ import {
   loadPdfPage,
   loadPdfText,
   renderImageView,
+  pillBtn,
   renderAudioView,
   renderVideoView,
   renderPdfView,
@@ -81,6 +83,11 @@ function splitMdBlocks(text) {
   flush();
   return blocks;
 }
+
+const mermaidCode = (b) => {
+  const m = /^\s*(```|~~~)mermaid[^\n]*\n([\s\S]*?)\n\s*\1\s*$/.exec(b);
+  return m ? m[2] : null;
+};
 
 const isFencedBlock = (b) => /^\s*(```|~~~)/.test(b);
 
@@ -504,6 +511,8 @@ export default class FileView extends View {
     this.mediaError = null;
     this.isSvgFile = false;
     this.svgPreview = null;
+    this.mermaidZoom = null;
+    this.savedMediaData = null;
     this.imgFit = true;
     this.imgZoom = 1;
     this.audioStatus = null;
@@ -1747,7 +1756,68 @@ export default class FileView extends View {
   }
 
   // Blocks are rendered lazily (only the visible ones) so a huge markdown file doesn't lay out whole.
-  renderMdPreview() {
+  // A ```mermaid block draws as a rendered PNG (mmdc, cached by hash); until it is ready, or if it
+  // fails, the block stays as code with the error underneath.
+  renderMdBlock(block, i, cx) {
+    const code = mermaidCode(block);
+    if (code === null) return TextView.markdown(`fv-md-${this.slotId}-p${i}`, block);
+    if (!this.mermaidCache) this.mermaidCache = new Map();
+    // Drawn in the theme's colors so the PNG blends with the preview instead of a white card.
+    const t = theme();
+    const colors = {};
+    for (const k of ["background", "foreground", "border", "muted", "chrome", "raised"]) if (typeof t[k] === "string") colors[k] = t[k];
+    const cacheKey = `${JSON.stringify(colors)}|${code}`;
+    let entry = this.mermaidCache.get(cacheKey);
+    if (!entry) {
+      entry = { state: "loading" };
+      this.mermaidCache.set(cacheKey, entry);
+      cx.spawn(async (cx) => {
+        try {
+          Object.assign(entry, { state: "ok", ...(await loadMermaid(code, colors)) });
+        } catch (e) {
+          Object.assign(entry, { state: "error", error: String(e?.message || e) });
+        }
+        cx.notify();
+      });
+    }
+    if (entry.state === "ok") {
+      // The PNG may be rendered at 2x (mmdc); show it at its logical size, capped to 900px wide.
+      const w = Math.min(Math.round(entry.width / (entry.scale || 1)), 900);
+      return image(entry.relPath).w(w).h(Math.round((entry.height * w) / entry.width));
+    }
+    const code_el = TextView.markdown(`fv-md-${this.slotId}-p${i}`, block);
+    return entry.state === "loading"
+      ? code_el
+      : v_flex().child(code_el).child(div().text_size(12).child(`mermaid: ${entry.error}`));
+  }
+
+  // Clicking a diagram swaps the document for the image viewer (Fit, 100%, +/-, scroll to pan).
+  closeMermaidZoom(cx) {
+    this.mermaidZoom = null;
+    this.mediaData = this.savedMediaData ?? null;
+    this.savedMediaData = null;
+    cx.notify();
+  }
+
+  renderMdPreview(cx, slot, fullPath) {
+    if (this.mermaidZoom) {
+      const t = theme();
+      return v_flex()
+        .flex_1()
+        .min_h(0)
+        .child(
+          h_flex()
+            .h(34)
+            .flex_none()
+            .px(12)
+            .items_center()
+            .gap(8)
+            .border_b(1)
+            .border_color(t.border)
+            .child(pillBtn("fv-mmd-back", "← Back to document", false, t, (_e, cx) => this.closeMermaidZoom(cx))),
+        )
+        .child(renderImageView(this, slot, fullPath, t));
+    }
     if (this.mdBlocksSrc !== this.markdownText) {
       this.mdBlocks = splitMdBlocks(this.markdownText);
       this.mdBlocksSrc = this.markdownText;
@@ -1763,7 +1833,7 @@ export default class FileView extends View {
           id,
           blocks.length,
           (i) => `${i}`,
-          (i) => div().px(20).py(6).child(TextView.markdown(`fv-md-${this.slotId}-p${i}`, blocks[i])),
+          (i) => div().px(20).py(6).child(this.renderMdBlock(blocks[i], i, cx)),
         ).size_full(),
       )
       .child(Scrollbar.vertical(id).absolute().inset_0());
@@ -2419,7 +2489,7 @@ export default class FileView extends View {
               : this.mdPreview && this.markdownText
                 ? this.fileSearchOpen && this.fileSearchQuery.trim()
                   ? this.renderMdSearchView(t)
-                  : this.renderMdPreview()
+                  : this.renderMdPreview(cx, slot, fullPath)
                 : this.code && this.fileSearchOpen && this.fileSearchQuery.trim()
                   ? this.renderCodeSearchView(t)
                   : this.code
