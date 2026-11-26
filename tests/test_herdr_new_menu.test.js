@@ -1,5 +1,5 @@
 import { test, expect } from "bun:test";
-import { installedAgents } from "../mods/new-menu-custom/filter.js";
+import { installedAgents } from "../new-menu-custom/mods/new-menu-custom/filter.js";
 
 test("installedAgents keeps only installed entries in original order", () => {
   const agents = [

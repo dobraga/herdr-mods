@@ -12,7 +12,7 @@ mkdir -p "$FH/.config/herdr-app/layouts" "$FH/.config/herdr-app/mods" "$FH/.loca
 # Herdr config: layout, keys, mods (a copy, so the demo can stub network helpers)
 cp "$real_home/src/dotfiles/herdr-app/"{keys.json,settings.json} "$FH/.config/herdr-app/"
 cp "$real_home/src/dotfiles/herdr-app/layouts/main-folders.json" "$FH/.config/herdr-app/layouts/"
-cp -r "$repo"/mods/* "$FH/.config/herdr-app/mods/"
+cp -r "$repo"/*/mods/* "$FH/.config/herdr-app/mods/"
 ln -s "$real_home/.local/share/fonts" "$FH/.local/share/fonts" 2>/dev/null || true
 
 # Shell: neutral prompt, fake agent CLIs first on PATH

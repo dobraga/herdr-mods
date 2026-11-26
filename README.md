@@ -1,10 +1,23 @@
 # herdr-mods
 
-Mods for [Herdr](https://herdr.dev), each in its own folder under `mods/` with a `RECIPE.md` (a brief an agent can rebuild it from) and a `preview.png`.
+Mods for [Herdr](https://herdr.dev), each in its own folder with a `RECIPE.md` (a brief an agent can rebuild it from) and a `preview.png`.
+
+## Layout
+
+Gallery layout (herdr.dev/mods): every mod is a top-level folder with its files in `mods/<name>/`, plus `RECIPE.md` and `preview.png`.
+`tools/` (the Tasks scheduler, preview tooling), `tests/` and `install.sh` are not mods.
+
+```
+inbox/
+  mods/inbox/      main.js, mod.json, ...
+  RECIPE.md
+  preview.png
+tools/tasks/       herdr-tasks, the scheduler the `tasks` mod needs
+```
 
 ## Install
 
-Ask your Herdr agent to add `herdr.dev/mods/dobraga/<name>`: it reads the recipe and every file first, and tells you if a mod reaches the network or runs programs.
+Ask your Herdr agent to add `herdr.dev/mods/dobraga/herdr-mods--<name>`: it reads the recipe and every file first, and tells you if a mod reaches the network or runs programs.
 
 Or clone the repo and link the mods yourself:
 
@@ -17,7 +30,7 @@ cd ~/src/herdr-mods
 ./install.sh --uninstall     # remove the links and the scheduler service
 ```
 
-Mods are symlinked into `~/.config/herdr-app/mods/`, so `git pull` updates them. An existing real folder with the same name is moved to `~/.config/herdr-app/.backups/mods/`.
+Mods (`<name>/mods/<name>/`) are symlinked into `~/.config/herdr-app/mods/`, so `git pull` updates them. An existing real folder with the same name is moved to `~/.config/herdr-app/.backups/mods/`.
 
 ### The Tasks scheduler (`tools/tasks`)
 
@@ -60,17 +73,17 @@ Eight mods are forks of mods shipped with Herdr (`forks.json`). After a Herdr up
 
 ```sh
 tools/check-forks.sh                 # lists forks whose upstream mod changed
-# diff ~/.config/herdr-app/mods/<upstream>/main.js against mods/<fork>/main.js, merge, then:
+# diff ~/.config/herdr-app/mods/<upstream>/main.js against <fork>/mods/<fork>/main.js, merge, then:
 tools/check-forks.sh --sync <fork>   # or: --sync all
 ```
 
 ## Development
 
 ```sh
-bun test tests/ mods/*/*.test.mjs mods/inbox/test/   # JS tests
+bun test tests/ */mods/*/*.test.mjs inbox/mods/inbox/test/   # JS tests
 uv run --with pytest pytest tests                     # Python tests
-herdr-app check mods/<name>                           # load a mod once
-uv run tools/crop.py <mod> shot.png                   # crop a full-window shot into the mod's preview.png
+herdr-app check <name>/mods/<name>                    # load a mod once
+uv run tools/crop.py <mod> shot.png                   # crop a full-window shot into <name>/preview.png
 ```
 
 ### Previews without real data

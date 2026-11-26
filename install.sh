@@ -31,14 +31,15 @@ main() {
   echo "Done. Restart Herdr if it does not pick the mods up."
 }
 
+# Gallery layout: <name>/mods/<name>/ (+ RECIPE.md, preview.png) per mod
 list_mods() {
-  for dir in "$root"/mods/*/; do
-    [ -f "$dir/mod.json" ] && basename "$dir"
+  for dir in "$root"/*/mods/*/; do
+    [ -f "${dir}mod.json" ] && basename "$dir"
   done
 }
 
 link_mod() {
-  local name="$1" src="$root/mods/$1" dst="$home/mods/$1"
+  local name="$1" src="$root/$1/mods/$1" dst="$home/mods/$1"
   [ -f "$src/mod.json" ] || { echo "no such mod: $name" >&2; return 1; }
   mkdir -p "$home/mods"
   if [ -e "$dst" ] && [ ! -L "$dst" ]; then

@@ -1,5 +1,5 @@
 import { test, expect } from "bun:test";
-import { dropPlace, mergeTab, terminalsOf, findTab } from "../mods/tabs-folders/move.js";
+import { dropPlace, mergeTab, terminalsOf, findTab } from "../tabs-folders/mods/tabs-folders/move.js";
 
 const term = (id, t, extra = {}) => ({ type: "block", id, content: { terminal: t }, ...extra });
 const chat = (id) => ({ type: "block", id, content: { mod: "chat", props: { chat: "c-1" } } });

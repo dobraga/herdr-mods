@@ -1,5 +1,5 @@
 import { test, expect } from "bun:test";
-import { groupTabs, tabKey } from "../mods/space-folders/groups.js";
+import { groupTabs, tabKey } from "../space-folders/mods/space-folders/groups.js";
 
 const MAIN = "/w/repo", WT = "/w/repo-wt", REPO = JSON.stringify([null, "/w/repo/.git"]);
 const key = (cwd) => JSON.stringify([null, cwd]);
@@ -79,7 +79,7 @@ test("tabKey prefers the agent pane's cwd and ignores panes without one", () => 
 });
 
 test("worktreesFirst puts each checkout's worktrees before it", async () => {
-  const { worktreesFirst } = await import("../mods/space-folders/groups.js");
+  const { worktreesFirst } = await import("../space-folders/mods/space-folders/groups.js");
   const r = (id, tree = null) => ({ w: { id }, tree });
   expect(worktreesFirst([r("a"), r("w1", "├─"), r("w2", "└─"), r("b"), r("w3", "└─"), r("c")]).map((x) => x.w.id))
     .toEqual(["w1", "w2", "a", "w3", "b", "c"]);

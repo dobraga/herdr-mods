@@ -4,8 +4,8 @@
 # ///
 """Crop a full-window Herdr shot to one mod's area, saved as its preview.png.
 
-    uv run publish/crop.py <mod> <shot.png> [--dest ~/src/herdr-mods]
-    uv run publish/crop.py --list
+    uv run tools/crop.py <mod> <shot.png> [--dest ~/src/herdr-mods]
+    uv run tools/crop.py --list
 
 Regions are fractions of the window (x0, y0, x1, y1) in the main-folders layout.
 Open the preview afterwards and check no real names, paths or messages are visible.
@@ -60,7 +60,7 @@ def main() -> None:
 
 
 def crop_preview(mod: str, shot: Path, dest: Path) -> Path:
-    """Crop `shot` to the region of `mod`; save as `dest/mods/<mod>/preview.png`."""
+    """Crop `shot` to the region of `mod`; save as `dest/<mod>/preview.png`."""
     image = Image.open(shot).convert("RGB")
     width, height = image.size
     regions = REGIONS[mod] if isinstance(REGIONS[mod], list) else [REGIONS[mod]]
@@ -77,7 +77,7 @@ def crop_preview(mod: str, shot: Path, dest: Path) -> Path:
     for part in parts:
         sheet.paste(part, (0, top))
         top += part.height
-    out = dest.expanduser() / "mods" / mod / "preview.png"
+    out = dest.expanduser() / mod / "preview.png"
     sheet.save(out)
     return out
 
