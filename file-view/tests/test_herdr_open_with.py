@@ -11,7 +11,7 @@ from unittest import mock
 import urllib.error
 import urllib.request
 
-MOD_DIR = Path(__file__).resolve().parent.parent / "file-view" / "mods" / "file-view"
+MOD_DIR = Path(__file__).resolve().parent.parent / "mods" / "file-view"
 OPEN_WITH_PY = MOD_DIR / "open-with.py"
 MEDIA_HELPER_PY = MOD_DIR / "media-helper.py"
 

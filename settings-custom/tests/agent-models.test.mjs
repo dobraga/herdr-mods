@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { groupVariants, parseEfforts, parseModelList, shape, baseOf, pickModel, pickEffort, effortOf, levelsOf, defaultVariant } from "./agent-models.js";
+import { groupVariants, parseEfforts, parseModelList, shape, baseOf, pickModel, pickEffort, effortOf, levelsOf, defaultVariant } from "../mods/settings-custom/agent-models.js";
 
 const AGY = [["gemini-4-neon-low", "Gemini 4 Neon (Low)"], ["gemini-4-neon-high", "Gemini 4 Neon (High)"], ["plain-model", "Plain"]];
 

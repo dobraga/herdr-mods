@@ -1,10 +1,10 @@
 import { test, expect } from "bun:test";
-import { mergeRepoRoots, discoverRepoRoots, repoName, normalizeRemoteSlug } from "../changes-tabs/mods/changes-tabs/repos.js";
+import { mergeRepoRoots, discoverRepoRoots, repoName, normalizeRemoteSlug } from "../mods/changes-tabs/repos.js";
 import { readFileSync } from "node:fs";
 
 test("mods keep identical copies of repos.js", () => {
-  const a = readFileSync(new URL("../changes-tabs/mods/changes-tabs/repos.js", import.meta.url), "utf8");
-  const b = readFileSync(new URL("../prs-panel/mods/prs-panel/repos.js", import.meta.url), "utf8");
+  const a = readFileSync(new URL("../mods/changes-tabs/repos.js", import.meta.url), "utf8");
+  const b = readFileSync(new URL("../../prs-panel/mods/prs-panel/repos.js", import.meta.url), "utf8");
   expect(b).toBe(a);
 });
 

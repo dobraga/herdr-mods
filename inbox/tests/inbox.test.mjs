@@ -1,8 +1,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { parseDialog, lastMessage, parseStopped, parseClassifier, answerPlan, composeAnswers, decisionLine, dialogId, hash, classifyPrompt } from "../asks.js";
-import { autoSeenItems, profilesOfFolder, inProfile, hiddenElsewhere, profileOf, classifierFor, buildItems, rank, normalizeSettings, pruneState, emptyState, parseState, needsYouCount, DEFAULT_SETTINGS } from "../items.js";
+import { parseDialog, lastMessage, parseStopped, parseClassifier, answerPlan, composeAnswers, decisionLine, dialogId, hash, classifyPrompt } from "../mods/inbox/asks.js";
+import { autoSeenItems, profilesOfFolder, inProfile, hiddenElsewhere, profileOf, classifierFor, buildItems, rank, normalizeSettings, pruneState, emptyState, parseState, needsYouCount, DEFAULT_SETTINGS } from "../mods/inbox/items.js";
 
 const PERMISSION = `
 ● Bash(rm -rf build)

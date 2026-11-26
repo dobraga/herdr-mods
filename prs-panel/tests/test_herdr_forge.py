@@ -11,7 +11,7 @@ import tempfile
 import unittest
 from unittest import mock
 
-HELPER_PATH = Path(__file__).resolve().parents[1] / "prs-panel" / "mods" / "prs-panel" / "forge-helper.py"
+HELPER_PATH = Path(__file__).resolve().parents[1] / "mods" / "prs-panel" / "forge-helper.py"
 SPEC = importlib.util.spec_from_file_location("forge_helper", HELPER_PATH)
 forge = importlib.util.module_from_spec(SPEC)
 assert SPEC and SPEC.loader

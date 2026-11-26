@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { taskVisible } from "./scope.js";
+import { taskVisible } from "../mods/tasks/scope.js";
 
 const sf = { "": { list: [{ id: "f1", profile: "work" }], of: { s1: "f1" }, spaceProfiles: { s2: "personal" } } };
 const spaces = [{ id: "s1", folder: "/src/api" }, { id: "s2", folder: "/src/blog" }, { id: "s3", folder: "/src/remote", machine: "m" }];

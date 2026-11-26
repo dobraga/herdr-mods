@@ -5,11 +5,12 @@ Mods for [Herdr](https://herdr.dev), each in its own folder with a `RECIPE.md` (
 ## Layout
 
 Gallery layout (herdr.dev/mods): every mod is a top-level folder with its files in `mods/<name>/`, plus `RECIPE.md` and `preview.png`.
-`tools/` (the Tasks scheduler, preview tooling), `tests/` and `install.sh` are not mods.
+A mod's tests live in its own folder (`<name>/tests/`). `tools/` (the Tasks scheduler, preview tooling) and `install.sh` are not mods.
 
 ```
 inbox/
   mods/inbox/      main.js, mod.json, ...
+  tests/           the mod's tests
   RECIPE.md
   preview.png
 tools/tasks/       herdr-tasks, the scheduler the `tasks` mod needs
@@ -80,8 +81,8 @@ tools/check-forks.sh --sync <fork>   # or: --sync all
 ## Development
 
 ```sh
-bun test tests/ */mods/*/*.test.mjs inbox/mods/inbox/test/   # JS tests
-uv run --with pytest pytest tests                     # Python tests
+bun test */tests/                                    # JS tests (of every mod, or one: bun test inbox/tests)
+uv run --with pytest pytest prs-panel/tests file-view/tests   # Python tests
 herdr-app check <name>/mods/<name>                    # load a mod once
 uv run tools/crop.py <mod> shot.png                   # crop a full-window shot into <name>/preview.png
 ```
