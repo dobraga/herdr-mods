@@ -23,27 +23,27 @@ Region = tuple[float, float, float, float]
 
 RIGHT_PANEL: Region = (0.783, 0.05, 0.995, 0.945)
 RIGHT_PANEL_MODS = (
-    "changes-tabs",
-    "files-tabs",
-    "prs-panel",
-    "loadout",
-    "tasks",
-    "inbox",
+    "dg-changes",
+    "dg-files",
+    "dg-prs",
+    "dg-loadout",
+    "dg-tasks",
+    "dg-inbox",
 )
 
 REGIONS: dict[str, Region | list[Region]] = {
     **dict.fromkeys(RIGHT_PANEL_MODS, RIGHT_PANEL),
-    "space-folders": (0.0, 0.04, 0.155, 0.32),
-    "agents-custom": (0.0, 0.49, 0.155, 0.80),
-    "workspace-chrome-custom": (0.0, 0.0, 0.153, 1.0),
-    "tabs-folders": (0.155, 0.0, 1.0, 0.046),
-    "workspace-status-usage": (0.155, 0.968, 0.84, 1.0),
-    "file-view": (0.158, 0.05, 0.78, 0.96),
-    "file-picker": (0.32, 0.05, 0.68, 0.58),
-    "new-tab": (0.40, 0.34, 0.60, 0.66),
-    "new-menu-custom": (0.47, 0.052, 0.78, 0.405),
-    "settings-custom": (0.24, 0.158, 0.76, 0.842),
-    "desktop-toast": (0.79, 0.85, 0.995, 0.945),
+    "dg-spaces": (0.0, 0.04, 0.155, 0.32),
+    "dg-agents": (0.0, 0.49, 0.155, 0.80),
+    "dg-workspace-chrome": (0.0, 0.0, 0.153, 1.0),
+    "dg-tabs": (0.155, 0.0, 1.0, 0.046),
+    "dg-workspace-status": (0.155, 0.968, 0.84, 1.0),
+    "dg-file-view": (0.158, 0.05, 0.78, 0.96),
+    "dg-file-picker": (0.32, 0.05, 0.68, 0.58),
+    "dg-new-tab": (0.40, 0.34, 0.60, 0.66),
+    "dg-new-menu": (0.47, 0.052, 0.78, 0.405),
+    "dg-settings": (0.24, 0.158, 0.76, 0.842),
+    "dg-desktop-toast": (0.79, 0.85, 0.995, 0.945),
 }
 
 

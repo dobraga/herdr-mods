@@ -16,30 +16,30 @@ snap() {
   echo "ok $1"
 }
 
-# desktop-toast goes last: its toast stays on screen and would cover the next shots
-all=(files-tabs changes-tabs prs-panel loadout tasks inbox tabs-folders space-folders agents-custom
-  workspace-chrome-custom workspace-status-usage file-view file-picker new-tab settings-custom new-menu-custom desktop-toast)
+# dg-desktop-toast goes last: its toast stays on screen and would cover the next shots
+all=(dg-files dg-changes dg-prs dg-loadout dg-tasks dg-inbox dg-tabs dg-spaces dg-agents
+  dg-workspace-chrome dg-workspace-status dg-file-view dg-file-picker dg-new-tab dg-settings dg-new-menu dg-desktop-toast)
 mods=("${@:-${all[@]}}")
 
 for mod in "${mods[@]}"; do
   case "$mod" in
-    desktop-toast)
+    dg-desktop-toast)
       act space.new --name api-gateway --folder "$FH/web-app" --argv '["codex","blocked"]'; sleep 1; snap "$mod"
       act space.select --index 1 ;;
-    files-tabs | changes-tabs | prs-panel | loadout | tasks | inbox)
-      child="${mod%-tabs}"; panel "${child%-panel}"; [ "$mod" = inbox ] && sleep "${INBOX_WAIT:-45}"  # PR alerts need a second sync
+    dg-files | dg-changes | dg-prs | dg-loadout | dg-tasks | dg-inbox)
+      panel "${mod#dg-}"; [ "$mod" = dg-inbox ] && sleep "${INBOX_WAIT:-45}"  # PR alerts need a second sync
       snap "$mod" ;;
-    tabs-folders | space-folders | agents-custom | workspace-chrome-custom | workspace-status-usage)
+    dg-tabs | dg-spaces | dg-agents | dg-workspace-chrome | dg-workspace-status)
       panel files; snap "$mod" ;;
-    file-view)
-      act tab.new --name README.md --mod file-view --props \
+    dg-file-view)
+      act tab.new --name README.md --mod dg-file-view --props \
         "{\"slotId\":\"demo-$(date +%s)\",\"kind\":\"file\",\"path\":\"README.md\",\"root\":\"$FH/acme-api\",\"name\":\"README.md\",\"preview\":false,\"updatedAt\":$(date +%s%3N)}"
       sleep 2; snap "$mod"; act tab.close ;;
-    file-picker | new-tab | settings-custom)
+    dg-file-picker | dg-new-tab | dg-settings)
       act mod.open --name "$mod"
       sleep 2; snap "$mod"; act overlay.close ;;
-    new-menu-custom)  # opened by the tab bar's + as a popup; as a pane it shows the same menu
-      act pane.split --direction right --mod new-menu-custom; sleep 2; snap "$mod"; act pane.close ;;
+    dg-new-menu)  # opened by the tab bar's + as a popup; as a pane it shows the same menu
+      act pane.split --direction right --mod dg-new-menu; sleep 2; snap "$mod"; act pane.close ;;
     *) echo "unknown mod $mod" >&2; exit 1 ;;
   esac
 done
