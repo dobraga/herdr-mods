@@ -16,8 +16,9 @@ snap() {
   echo "ok $1"
 }
 
-all=(desktop-toast files-tabs changes-tabs prs-panel loadout tasks inbox tabs-folders space-folders agents-custom
-  workspace-chrome-custom workspace-status-usage file-view file-picker new-tab settings-custom new-menu-custom)
+# desktop-toast goes last: its toast stays on screen and would cover the next shots
+all=(files-tabs changes-tabs prs-panel loadout tasks inbox tabs-folders space-folders agents-custom
+  workspace-chrome-custom workspace-status-usage file-view file-picker new-tab settings-custom new-menu-custom desktop-toast)
 mods=("${@:-${all[@]}}")
 
 for mod in "${mods[@]}"; do
