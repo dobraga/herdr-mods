@@ -386,7 +386,7 @@ export default class Spaces extends View {
     // `git status` walks the whole tree, on another machine a process there:
     // only when its answer could have changed (see `due`).
     cx.timer.every(250, (cx) => this.checkNew(cx));
-    // "space-folders.next" and ".prev" in keys.json: the next space down the
+    // "dg-spaces.next" and ".prev" in keys.json: the next space down the
     // list as it shows, where Herdr's own space.next goes by its own order.
     this.seen = [];
     this.blocked = new Map();

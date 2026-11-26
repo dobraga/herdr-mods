@@ -36,7 +36,7 @@ The mod has `"place": "none"`, so it needs a slot in a layout. The sidebar block
 Optional keys to step through spaces (not shipped, add them to `keys.json`):
 
 ```json
-{ "alt-down": "space-folders.next", "alt-up": "space-folders.prev" }
+{ "alt-down": "dg-spaces.next", "alt-up": "dg-spaces.prev" }
 ```
 
 </details>

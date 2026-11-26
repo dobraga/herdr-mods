@@ -39,7 +39,7 @@ Clicks, keys, hovers:
 - Profile chip click: filters the list to that profile and selects its last shown space (or the first). Right-click a chip: "Configure GitHub / Bitbucket...", "Rename profile...", "Delete profile". The selected profile follows focus: when the focused pane or shown space lands in another profile, the chip switches (unless shared `space-folders.follow` is `false`).
 - A space made from a folder's "+" goes into that folder; one made from the space in front (Herdr's own new-space keys) lands right under it, in its folder, within 3 seconds. Closing the front space selects the one above it in the list.
 - PR chip click: sets shared `forge.focusPrKey`, then `layout.select {stack: panel-body, child: prs}` and `layout.show {id: panel}`.
-- Keys: commands `space-folders.next` / `space-folders.prev` (bound by the person in `keys.json`, not shipped) step through spaces in the list's visual order, skipping folded ones, wrapping.
+- Keys: commands `dg-spaces.next` / `dg-spaces.prev` (bound by the person in `keys.json`, not shipped) step through spaces in the list's visual order, skipping folded ones, wrapping.
 - Tab and tab-list open state persist per space (local storage `spaces.tabs.open`); folded machines in `machines.folded`; selected profile in `space-folders.profile`.
 - Git is refreshed on new places, when a command or agent turn ends, when a machine returns, when a repo's `.git` folder changes (`watchFolder`), and every 60s for visible repos while the window is active.
 
@@ -76,7 +76,7 @@ Differences from upstream spaces:
 - Tab lists under each space (tree or compact), split-tab pane lines, per-tab status, tabs placed under the worktree of their own cwd (`groups.js`).
 - Rows lose the colored avatar; blocked/done counts replace the avatar status mark; the machine "connect/repair" row and login helper of upstream are dropped; rail cells are replaced by number + glyph.
 - PR chips and ahead/behind on git tails, repo slug from `remote.origin.url` (GitHub or Bitbucket only).
-- New spaces made from the space in front are placed under it; closing the front space selects its upper neighbor; `space-folders.next/prev` commands.
+- New spaces made from the space in front are placed under it; closing the front space selects its upper neighbor; `dg-spaces.next/prev` commands.
 - Extra imports (`closeOverlay`, `props`, `pickFolder`, `home`, `appHome`, `checking`, `nextCommand`, `readTextFile`, `InputState`, `Input`, `image`).
 
 Derived from Herdr's spaces mod (Apache-2.0), see ../NOTICE.

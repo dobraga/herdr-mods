@@ -44,8 +44,8 @@ The mod has `"place": "none"`, so it is placed by a layout node. Example (a 42px
 Optional keys for next/previous tab:
 
 ```json
-"ctrl-tab": "tabs-folders.next",
-"ctrl-shift-tab": "tabs-folders.prev"
+"ctrl-tab": "dg-tabs.next",
+"ctrl-shift-tab": "dg-tabs.prev"
 ```
 
 </details>
@@ -55,7 +55,7 @@ Optional keys for next/previous tab:
 - Click a tab to select it (its space is selected first if different). Double-click renames it; on a file preview tab it pins it.
 - Right-click opens the tab menu (a file tab shows a file-specific menu). The x closes the tab without a prompt.
 - Mouse wheel or touchpad pans the strip only; it never changes the selected tab.
-- `tabs-folders.next` / `tabs-folders.prev` select the next or previous tab, wrapping.
+- `dg-tabs.next` / `dg-tabs.prev` select the next or previous tab, wrapping.
 - Drag a tab onto the edge of another tab to reorder. Drop it on the middle of a tab in the same space, or below the bar, to join it as a split to the right (hold Shift, or release in the bottom of the content, for a split below). A failed merge shows a "Tab not moved" toast.
 - Panel buttons toggle the side panel. The open panel is remembered per space (browser-style `localStorage` key `panels`).
 - "+" opens the `dg-new-menu` popup. Window buttons (minimize, maximize, close) appear only when the window reports them.
