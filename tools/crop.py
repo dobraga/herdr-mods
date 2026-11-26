@@ -35,7 +35,7 @@ REGIONS: dict[str, Region | list[Region]] = {
     **dict.fromkeys(RIGHT_PANEL_MODS, RIGHT_PANEL),
     "space-folders": (0.0, 0.04, 0.155, 0.32),
     "agents-custom": (0.0, 0.49, 0.155, 0.80),
-    "workspace-chrome-custom": [(0.0, 0.0, 0.152, 0.05), (0.0, 0.93, 0.152, 0.995)],
+    "workspace-chrome-custom": (0.0, 0.0, 0.153, 1.0),
     "tabs-folders": (0.155, 0.0, 1.0, 0.046),
     "workspace-status-usage": (0.155, 0.968, 0.84, 1.0),
     "file-view": (0.158, 0.05, 0.78, 0.96),
