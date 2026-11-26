@@ -30,8 +30,7 @@ A Herdr layout built on the shipped `main` layout: a spaces and agents sidebar o
 
 - Layout file: `layouts/dg-main-folders.json` (`cloned_from` shipped `main` 0.1.10). Its keys are in `keys.json`, under `layout:dg-main-folders`.
 - Shipped mods: `workspace-chrome` and `pane`. `new-chat` and `chat-menu` come from [herdr-chat](https://github.com/dobraga/herdr-chat) (the floating new-chat block and the terminal menu).
-- `mods/` in this folder holds a copy of every `dg-*` mod the layout uses (`tools/sync-layout.sh` refreshes it from the mod folders of the repo).
-- Mods from this repo (each has its own `RECIPE.md` in `../<name>/`): `dg-spaces`, `dg-agents`, `dg-workspace-chrome`, `dg-tabs`, `dg-files`, `dg-changes`, `dg-prs`, `dg-loadout`, `dg-tasks`, `dg-inbox`, `dg-workspace-status`, `dg-desktop-toast`. Opening files needs `dg-file-view`, Quick Open `dg-file-picker`, the + buttons `dg-new-tab` and `dg-new-menu`, and the Settings rows `dg-settings`.
+- Mods from this repo (each is a folder of this repo, with its own `RECIPE.md`: `https://github.com/dobraga/herdr-mods/tree/main/<name>`; install them first): `dg-spaces`, `dg-agents`, `dg-workspace-chrome`, `dg-tabs`, `dg-files`, `dg-changes`, `dg-prs`, `dg-loadout`, `dg-tasks`, `dg-inbox`, `dg-workspace-status`, `dg-desktop-toast`. Opening files needs `dg-file-view`, Quick Open `dg-file-picker`, the + buttons `dg-new-tab` and `dg-new-menu`, and the Settings rows `dg-settings`.
 - Nodes: root row, `sidebar` column (`brand`, `sidebar-lists` column, `sidebar-footer`), `work` column (`tabs`, `work-body` row of `main` + `panel` column with a `panel-body` stack, `status`).
 
 ## Watch out

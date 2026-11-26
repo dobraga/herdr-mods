@@ -4,7 +4,7 @@
 
 A Herdr layout for working with several projects and agents at once. A sidebar groups your spaces in colored folders and lists every running agent by urgency. A tab bar sits over the terminals and carries six tool panels (Files, Changes, PRs, Loadout, Tasks and Inbox), and a status bar at the bottom shows the branch, PR and CI state, agent count, usage and system load.
 
-It is built from the `dg-*` mods in this repo, which are included in this folder.
+It is built from the `dg-*` mods of this repo, each installed from its own folder.
 
 ## Quick start
 
@@ -18,7 +18,7 @@ Copy this prompt into your Herdr agent:
 
 > Read ~/.config/herdr-app/AGENTS.md, then add this layout: https://github.com/dobraga/herdr-mods/tree/main/dg-main-folders
 
-[RECIPE.md](RECIPE.md) guides the install. The agent reads every file first, copies the layout to `layouts/` and each mod to `mods/`, and never overwrites a mod with the same name.
+[RECIPE.md](RECIPE.md) guides the install. The agent reads every file first, copies the layout to `layouts/`, adds each mod from its folder in this repo to `mods/`, and never overwrites a mod with the same name.
 
 <details>
 <summary>Install by hand</summary>
@@ -49,7 +49,7 @@ This links every `dg-*` mod into `~/.config/herdr-app/mods/`, links the layout a
 
 ## Requirements
 
-- The `dg-*` mods in `mods/` (copied, not downloaded, by the installer).
+- The `dg-*` mods of this repo (`./install.sh --setup` links them all; the agent install adds each from its folder).
 - [herdr-chat](https://github.com/dobraga/herdr-chat) for `new-chat` and `chat-menu`, which the layout uses for the floating new-chat block and the terminal menu. Without `new-chat` Herdr shows its own layout and lists what is missing.
 - `bun` for the Tasks scheduler (`./install.sh` installs it as a login service); `gh` for the PRs panel.
 - Written against Herdr 0.1.10 layouts.
