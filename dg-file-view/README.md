@@ -54,3 +54,7 @@ This links the mod into `~/.config/herdr-app/mods`; `git pull` updates it. The f
 - No network access beyond a token-guarded audio helper on `127.0.0.1`, which quits when the view closes or after 10 idle minutes.
 
 See [RECIPE.md](RECIPE.md) for how it is built.
+
+## Test file
+
+`samples/markdown-test.md` exercises the Markdown preview: text styles, nested lists, task lists, tables, code blocks, Mermaid diagrams, images, HTML and footnotes. Open it in a file view and use Ctrl+F.
