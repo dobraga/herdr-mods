@@ -1781,9 +1781,12 @@ export default class FileView extends View {
       });
     }
     if (entry.state === "ok") {
-      // The PNG may be rendered at 2x (mmdc); show it at its logical size, capped to 900px wide.
-      const w = Math.min(Math.round(entry.width / (entry.scale || 1)), 900);
-      return image(entry.relPath).w(w).h(Math.round((entry.height * w) / entry.width));
+      // Fit every diagram in the same box (900x480, scaled down only) so a tall one and a wide one
+      // read at a similar size; the PNG may be rendered at 2x (mmdc). Zoom shows it at full size.
+      const lw = entry.width / (entry.scale || 1);
+      const lh = entry.height / (entry.scale || 1);
+      const k = Math.min(1, 900 / lw, 480 / lh);
+      return image(entry.relPath).w(Math.round(lw * k)).h(Math.round(lh * k));
     }
     const code_el = TextView.markdown(`fv-md-${this.slotId}-p${i}`, block);
     return entry.state === "loading"
