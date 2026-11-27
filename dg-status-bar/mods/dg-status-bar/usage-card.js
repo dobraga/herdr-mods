@@ -1,24 +1,7 @@
 import { div, svg, image } from "gpui-kit";
 import { v_flex, h_flex } from "gpui-base";
 import { cfg, usageColor } from "./usage-settings.js";
-
-export function formatReset(iso) {
-  if (!iso) return "";
-  const ms = Date.parse(iso) - Date.now();
-  if (!Number.isFinite(ms) || ms <= 0) return "soon";
-  const mins = Math.floor(ms / 60000);
-  const hours = Math.floor(mins / 60);
-  const days = Math.floor(hours / 24);
-  if (days > 0) return `${days}d ${hours % 24}h`;
-  if (hours > 0) return `${hours}h ${mins % 60}m`;
-  return `${Math.max(1, mins)}m`;
-}
-
-// Single-unit variant for the status pill: "6d", "2h", "45m".
-export function formatResetShort(iso) {
-  const full = formatReset(iso);
-  return full.split(" ")[0];
-}
+import { formatReset, paceOf, WINDOW_MS } from "./segments/usage.js";
 
 function formatAge(ts) {
   if (!ts) return "not fetched yet";
@@ -28,16 +11,6 @@ function formatAge(ts) {
   const min = Math.floor(sec / 60);
   if (min < 60) return `${min}m ago`;
   return `${Math.floor(min / 60)}h ago`;
-}
-
-const H = 3600000;
-export const WINDOW_MS = { "5h": 5 * H, "7d": 168 * H, weekly: 168 * H };
-
-// Percent of the window already elapsed, or null when unknown.
-export function paceOf(resetIso, windowMs) {
-  const ms = Date.parse(resetIso ?? "") - Date.now();
-  if (!windowMs || !Number.isFinite(ms) || ms <= 0 || ms > windowMs) return null;
-  return Math.round((100 * (windowMs - ms)) / windowMs);
 }
 
 function meterRow(id, label, pct, resetIso, t, windowMs) {

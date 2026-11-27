@@ -36,16 +36,44 @@ Cards (anchored `top_center` popups, `t.popover` background, 10px radius, shadow
 - **PR sync:** 1.5s after start, then every `forge.state.pollIntervalSec` (default 90s), and when `shared("forge.refreshReq")` changes. New events from the helper become toasts (`notify`, action `workspace-status-usage.open-pr:<prKey>`) and are prepended to `forge.notifs` (max 50). Clicking the PR chip, the PRs button or such a toast selects the `prs` child of the `panel-body` stack and shows the `panel` node.
 - **Branch** comes from the space or its panes; otherwise `git rev-parse --abbrev-ref HEAD` is run in the space's cwd (on the remote machine if any).
 - **Media:** polled every 2s. Linux: MPRIS over `busctl --user`; macOS: `nowplaying-cli`. A playing player beats a paused one; no player hides the pill. Commands go through `shared("media.cmdReq")`. Volume falls back to `wpctl set-volume @DEFAULT_AUDIO_SINK@`.
-- **Settings** (JSON, defaults in `usage-settings.js`) are re-read on each refresh: `style` ring|bar|text, `warn`, `critical`, `showReset`, `showPace`, `colorMode`, `showPercent`, `ctxWarn`, `ctxCritical`, per-item `showComputer/Branch/Agents/Prs/System/Cpu/Mem/Herdr/Disk/Gpu/Net/Usage/Media/Procs/Spark`, `sysInterval`, `diskInterval`, `diskTop` (3/5/10). The effective config is also published as `shared("usage.settings")` and merged live on render.
+- **Settings** (JSON, defaults in `usage-settings.js`) are re-read on each refresh: `style` ring|bar|text, `warn`, `critical`, `showReset`, `showPace`, `colorMode`, `showPercent`, `ctxWarn`, `ctxCritical`, per-item `showComputer/Branch/Agents/Prs/System/Cpu/Mem/Herdr/Disk/Gpu/Net/Battery/Usage/Media/Procs/Spark`, `sysInterval`, `diskInterval`, `diskTop` (3/5/10). The effective config is also published as `shared("usage.settings")` and merged live on render.
+
+## Status bar segments
+
+Segments are the pluggable meters. Each one is a module in `mods/dg-status-bar/segments/<id>.js` (default export), and `segments/index.js` holds the ordered `REGISTRY`. Today: `cpu`, `mem`, `gpu`, `battery` (group `system`) and `usage` (group `item`).
+
+Contract (all fields optional except `id`, `key`, `group`, `order`, `title`, `about`, `defaultOn`):
+- `id`: unique name. `key`: the saved settings key (`showCpu`, `showGpu`, ...), unique and present in `defaults()`. Never rename a key that users have saved.
+- `group`: `"system"` puts the segment in the System monitor pill and card, gated by `showSystem`, and makes `readStats` sample it. `"item"` is not looped over by the system pill; `usage` is still mounted directly by `main.js`.
+- `order`: sort position. System gaps are reserved for the inline items (herdr 30, disk 40, net 70).
+- `sample(env, prev)`: returns this segment's slice of the snapshot, merged into `s` with `Object.assign`. `env` is `{ mac, exec, readTextFile, herdr, segments }`. Keep slice keys clear of `at`, `net`, `disk`, `herdr`, `down`, `up`.
+- `pill(s, t, ui)`: element, or `null` to show nothing. `card(s, t, hist, detail, ui)`: section element, or `null`. `hist` holds sparkline history, `detail` the on-demand processes and cores.
+- `settings`: sub-setting descriptors, each `{ key, kind, title, about, default }` plus:
+  - `toggle`: boolean.
+  - `choice`: `options: [{ value, label }]`.
+  - `stepper`: number with `min`, `max`, `step`, `unit`, and optional `before` / `after` (another key, kept 5 points apart, e.g. warn before critical).
+
+  `describe()` drops the functions and publishes the rest as `status.segments`. `dg-settings` builds its rows from that list, so a descriptor's `key` is saved in `settings.json` like a segment key.
+
+Render kit: `pill` gets `ui` as its third argument and `card` as its fifth. `ui` is built in `sys-card.js` and has `div, svg, h_flex, v_flex, cfg, pctColor, pillPct, bar, spark, head, procs, section`. Segment files must not import `gpui-kit` (or `gpui-base`), so they load in `usage-settings.js` and the tests. Pure helpers such as `sysstats.js` are fine.
+
+### Add a segment
+
+1. Copy `segments/gpu.js` to `segments/<id>.js` and set `id`, `key` (a new `showX`), `order`, `title`, `about`, `defaultOn`, `sample`, `pill` and `card`.
+2. In `segments/index.js`, add `import x from "./x.js";` and `x` to the `REGISTRY` array. That is the only other file.
+3. Nothing else needs wiring: `defaults()` and `applySettings` pick up the key, `readStats` samples it, the system pill and card loop over it, and the Settings tab shows a toggle (plus one row per `settings` descriptor) from `status.segments`.
+4. Check with `cd ~/src/herdr-mods && bun test dg-status-bar dg-settings`, then restart Herdr and flip the toggle.
 
 ## Built from
 
 Files (all in `mods/dg-status-bar/`):
 - `mod.json`: `{ "place": "none", "cloned_from": { "name": "workspace-status", "version": "0.1.16" } }`. The bar is placed by the layout, not by the mod.
 - `main.js`: the `WorkspaceStatusUsage` View (render, timers, forge sync, usage fetch, popups).
-- `usage-card.js`, `sys-card.js`, `media-card.js`: pure element builders for the three cards.
-- `usage-settings.js`: `cfg` defaults, `applySettings`, `usageColor`.
+- `usage-card.js`, `sys-card.js`, `media-card.js`: pure element builders for the three cards. `sys-card.js` also builds the `ui` render kit.
+- `usage-settings.js`: `cfg` defaults, `applySettings` (segment keys come from the registry), `usageColor`.
+- `segments/`: one module per pluggable segment and `index.js` (the registry); see "Status bar segments" above.
 - `sysstats.js`: parsers and `readStats`/`readDetail`/`readDiskTop` for Linux and macOS.
+- `battery.js`: battery % and charging state (Linux `/sys/class/power_supply/BAT0|BAT1`, macOS `pmset -g batt`); `null` when the machine has no battery, which hides the segment.
 - `media.js`: MPRIS / `nowplaying-cli` readers and commands.
 - `agent-focus.js`: `resolveFocusedAgent`, maps the focused terminal or chat pane to `claude` or `agy`.
 - `icons/`: 8 small monochrome SVGs (`agy`, `claude`, `cpu`, `disk`, `gpu`, `herdr`, `memory`, `net`). `rings/`: `track.svg` + `arc-5.svg` ... `arc-100.svg` (5% steps) used for the ring gauge, tinted with `text_color`.
@@ -73,6 +101,7 @@ Upstream (0.1.16) is a ~30-line view: computer, branch, agent count, spacer, pal
 - Focused-agent resolution (`agent-focus.js`), including chat-host terminals.
 - Git branch fallback via `git`, PR chip, PRs button with summary, forge sync, toasts and `forge.*` shared state.
 - System pill and card (`sysstats.js`, `sys-card.js`), including GPU, Herdr memory tree and top folders.
+- Battery % in the system pill (`battery.js`, `showBattery`): amber at 30%, red at 15% while discharging, bolt icon while charging.
 - Media pill and card (`media.js`, `media-card.js`).
 - Click-to-pin popups with a hover safety timer; the palette hint gets a pointer cursor; the agent label is always "agents" (upstream pluralizes: "1 agent", "needs"/"need").
 

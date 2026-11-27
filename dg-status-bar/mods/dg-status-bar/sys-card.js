@@ -2,6 +2,7 @@ import { div, svg } from "gpui-kit";
 import { v_flex, h_flex } from "gpui-base";
 import { cfg } from "./usage-settings.js";
 import { fmtRate, fmtBytes, pad2, HIST_LEN } from "./sysstats.js";
+import { SEGMENTS } from "./segments/index.js";
 
 const icon = (name, t) => svg(`mods/dg-status-bar/icons/${name}.svg`).size(14).flex_none().text_color(t.muted);
 const pctColor = (v, t) => (v >= cfg.critical ? t.ansi1 : v >= cfg.warn ? t.blocked : t.ansi2);
@@ -48,61 +49,54 @@ function formatAge(ts) {
   return sec < 5 ? "just now" : `${sec}s ago`;
 }
 
+function herdrCard(h, t, detail) {
+  const ofRam = detail?.mem?.total ? ` · ${Math.round((h.total / detail.mem.total) * 100)}% of RAM` : "";
+  return section(t).id("sys-herdr")
+    .tooltip(h.kinds.map((k) => `${k.label} (${k.n}): ${fmtBytes(k.bytes)}`).join("\n"))
+    .child(head("herdr", "Herdr", fmtBytes(h.total), t))
+    .child(v_flex().gap(2).children(h.kinds.slice(0, 4).map((k, i) => h_flex().id(`hk-${i}`).gap(6).text_size(11)
+      .child(div().flex_1().truncate().text_color(t.muted).child(`${k.label} · ${k.n}`))
+      .child(div().text_color(t.dim).child(fmtBytes(k.bytes))))))
+    .when(Boolean(ofRam), (el) => el.child(div().text_size(10.5).text_color(t.dim).child(`Herdr and everything it runs${ofRam}`)));
+}
+
+function diskCard(s, t, detail, diskTop, diskScanning) {
+  return section(t)
+    .child(head("disk", "Disk", detail?.disk ? `${fmtBytes(detail.disk.used)} / ${fmtBytes(detail.disk.total)}` : `${s.disk ?? "–"}%`, t, s.disk == null ? t.dim : pctColor(s.disk, t)))
+    .child(bar(s.disk, t))
+    .when(Boolean(detail?.disk), (el) => el.child(div().text_size(10.5).text_color(t.dim).child(`${fmtBytes(detail.disk.total - detail.disk.used)} free`)))
+    .when(cfg.showProcs && Boolean(diskTop?.items?.length), (el) => el.child(v_flex().gap(2).children(diskTop.items.slice(0, cfg.diskTop).map((d, i) => h_flex().id(`dk-${i}`).gap(6).text_size(11)
+      .child(div().flex_1().truncate().text_color(t.muted).child(d.name))
+      .child(div().text_color(t.dim).child(fmtBytes(d.bytes)))))))
+    .when(cfg.showProcs && Boolean(diskScanning) && !diskTop, (el) => el.child(div().text_size(10.5).text_color(t.dim).child("Scanning folders…")));
+}
+
+/** Pill item: icon + percentage, colored only past the warn/critical thresholds. */
+export function pillPct(name, v, t) {
+  const color = v >= cfg.critical ? t.ansi1 : v >= cfg.warn ? t.blocked : t.muted;
+  return h_flex().gap(5).items_center().child(svg(`mods/dg-status-bar/icons/${name}.svg`).size(13).flex_none().text_color(t.dim))
+    .child(div().w(30).flex_none().text_right().text_color(v == null ? t.dim : color).child(v == null ? "\u2007–%" : `${pad2(v)}%`));
+}
+
+/** Render kit handed to segment pill/card so segment files do not import gpui-kit. */
+export const ui = { div, svg, h_flex, v_flex, cfg, pctColor, pillPct, bar, spark, head, procs, section };
+
+/** Enabled registry segments plus the inline items ({ order, on, el }), in `order`; `render(seg)` may return null. */
+export function systemItems(inline, render) {
+  return [...SEGMENTS.map((seg) => ({ order: seg.order, on: cfg[seg.key], el: () => render(seg) })), ...inline]
+    .filter((i) => i.on).sort((a, b) => a.order - b.order).map((i) => i.el()).filter(Boolean);
+}
+
 // Pure element builder for the system card; rendered as the content of an anchored Popup.
 export function sysCard({ t, s, hist, detail, diskTop, diskScanning, pinned, onHover, onMove, onDismiss }) {
   const stop = (_e, cx) => cx.stop_propagation();
-  const memPct = s.mem;
-  const cards = [];
-  const body = { child: (c) => cards.push(c) };
-  if (cfg.showCpu) {
-    body.child(section(t)
-      .child(head("cpu", "CPU", s.cpu == null ? "–" : `${pad2(s.cpu)}%`, t, s.cpu == null ? t.dim : pctColor(s.cpu, t)))
-      .when(cfg.showSpark, (el) => el.child(spark(hist?.cpu ?? [], t, pctColor(s.cpu ?? 0, t), 100)))
-      .when(Boolean(detail?.cores), (el) => el.child(div().text_size(10.5).text_color(t.dim)
-        .child(`${detail.cores} cores${detail.load ? ` · load ${detail.load.map((n) => n.toFixed(2)).join(" ")}` : ""}`)))
-      .when(cfg.showProcs && Boolean(detail?.procs), (el) => el.child(procs(detail.procs.cpu, "cpu", t))));
-  }
-  if (cfg.showMem) {
-    body.child(section(t)
-      .child(head("memory", "Memory", detail?.mem ? `${fmtBytes(detail.mem.used)} / ${fmtBytes(detail.mem.total)}` : `${memPct ?? "–"}%`, t, memPct == null ? t.dim : pctColor(memPct, t)))
-      .child(cfg.showSpark ? spark(hist?.mem ?? [], t, memPct == null ? t.dim : pctColor(memPct, t), 100) : bar(memPct, t))
-      .when(Boolean(detail?.swap?.total), (el) => el.child(div().text_size(10.5).text_color(t.dim).child(`Swap ${fmtBytes(detail.swap.used)} / ${fmtBytes(detail.swap.total)}`)))
-      .when(cfg.showProcs && Boolean(detail?.procs), (el) => el.child(procs(detail.procs.mem, "mem", t))));
-  }
-  if (cfg.showHerdr && s.herdr) {
-    const h = s.herdr;
-    const ofRam = detail?.mem?.total ? ` · ${Math.round((h.total / detail.mem.total) * 100)}% of RAM` : "";
-    body.child(section(t).id("sys-herdr")
-      .tooltip(h.kinds.map((k) => `${k.label} (${k.n}): ${fmtBytes(k.bytes)}`).join("\n"))
-      .child(head("herdr", "Herdr", fmtBytes(h.total), t))
-      .child(v_flex().gap(2).children(h.kinds.slice(0, 4).map((k, i) => h_flex().id(`hk-${i}`).gap(6).text_size(11)
-        .child(div().flex_1().truncate().text_color(t.muted).child(`${k.label} · ${k.n}`))
-        .child(div().text_color(t.dim).child(fmtBytes(k.bytes))))))
-      .when(Boolean(ofRam), (el) => el.child(div().text_size(10.5).text_color(t.dim).child(`Herdr and everything it runs${ofRam}`))));
-  }
-  if (cfg.showDisk) {
-    body.child(section(t)
-      .child(head("disk", "Disk", detail?.disk ? `${fmtBytes(detail.disk.used)} / ${fmtBytes(detail.disk.total)}` : `${s.disk ?? "–"}%`, t, s.disk == null ? t.dim : pctColor(s.disk, t)))
-      .child(bar(s.disk, t))
-      .when(Boolean(detail?.disk), (el) => el.child(div().text_size(10.5).text_color(t.dim).child(`${fmtBytes(detail.disk.total - detail.disk.used)} free`)))
-      .when(cfg.showProcs && Boolean(diskTop?.items?.length), (el) => el.child(v_flex().gap(2).children(diskTop.items.slice(0, cfg.diskTop).map((d, i) => h_flex().id(`dk-${i}`).gap(6).text_size(11)
-        .child(div().flex_1().truncate().text_color(t.muted).child(d.name))
-        .child(div().text_color(t.dim).child(fmtBytes(d.bytes)))))))
-      .when(cfg.showProcs && Boolean(diskScanning) && !diskTop, (el) => el.child(div().text_size(10.5).text_color(t.dim).child("Scanning folders…"))));
-  }
-  if (cfg.showGpu && s.gpu) {
-    const g = s.gpu;
-    body.child(section(t)
-      .child(head("gpu", "GPU", `${pad2(g.util)}%`, t, pctColor(g.util, t)))
-      .when(cfg.showSpark, (el) => el.child(spark(hist?.gpu ?? [], t, pctColor(g.util, t), 100)))
-      .child(div().text_size(10.5).text_color(t.dim)
-        .child(`VRAM ${fmtBytes(g.memUsed)} / ${fmtBytes(g.memTotal)}${g.temp != null ? ` · ${g.temp}°C` : ""}`)));
-  }
-  if (cfg.showNet) {
-    body.child(section(t)
+  const cards = systemItems([
+    { order: 30, on: cfg.showHerdr && Boolean(s.herdr), el: () => herdrCard(s.herdr, t, detail) },
+    { order: 40, on: cfg.showDisk, el: () => diskCard(s, t, detail, diskTop, diskScanning) },
+    { order: 70, on: cfg.showNet, el: () => section(t)
       .child(head("net", "Network", `↓ ${fmtRate(s.down)}/s  ↑ ${fmtRate(s.up)}/s`, t))
-      .when(cfg.showSpark, (el) => el.child(spark(hist?.down ?? [], t, t.ansi2)).child(spark(hist?.up ?? [], t, t.accent))));
-  }
+      .when(cfg.showSpark, (el) => el.child(spark(hist?.down ?? [], t, t.ansi2)).child(spark(hist?.up ?? [], t, t.accent))) },
+  ], (seg) => seg.card?.(s, t, hist, detail, ui));
 
   return v_flex().id("sys-card-hit").pb(12).on_hover(onHover).on_mouse_move(onMove).child(
     v_flex().id("sys-card").w(Math.min(cards.length, 2) * 282 + 12 * (Math.min(cards.length, 2) + 1) + 2).rounded(10).bg(t.popover).border_1().border_color(t.border).shadow_lg()

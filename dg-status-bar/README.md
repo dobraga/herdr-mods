@@ -43,7 +43,9 @@ The mod's `place` is `none`, so the layout has to mount it. Add a block at the b
 - **System:** hover for sparklines and top processes (CPU, memory, Herdr memory, disk, GPU, network).
 - **Media:** prev / play-pause / next buttons, a seek bar and volume in the card.
 - **PRs:** click the PR chip or the PRs button to open the `prs` child of the `panel-body` stack and show the `panel` node in your layout; new PR events arrive as toasts.
-- **Settings:** a JSON file at `<appHome>/data/workspace-status-usage/settings.json`, re-read on each refresh. Keys include `style` (`ring`, `bar`, `text`), `warn`, `critical`, `colorMode` (`threshold`, `pace`), `showReset`, per-item switches such as `showSystem`, `showMedia`, `showPrs`, and `sysInterval` / `diskInterval`.
+- **Settings:** a JSON file at `<appHome>/data/workspace-status-usage/settings.json`, re-read on each refresh. Keys include `style` (`ring`, `bar`, `text`), `warn`, `critical`, `colorMode` (`threshold`, `pace`), `showReset`, per-item switches such as `showSystem`, `showMedia`, `showPrs`, and `showBattery`, and `sysInterval` / `diskInterval`.
+- **Saved settings:** the file path and key names are unchanged. Only an explicit `false` turns a segment off; a missing, `"false"`, `0` or `null` value keeps it on. Saved keys this version does not know (for example from a segment that is not loaded) are kept when Settings saves.
+- **Not pluggable yet:** herdr memory, disk and network (inline in the System pill and card), computer, branch, agents, PRs and media. CPU, memory, GPU and battery are segments; see [RECIPE.md](RECIPE.md#status-bar-segments) to add one.
 
 ## Requirements
 

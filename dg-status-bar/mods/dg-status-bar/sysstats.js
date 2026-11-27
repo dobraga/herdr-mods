@@ -12,7 +12,7 @@ export function fmtRate(bytesPerSec) {
 /** Pads a number to 2 digits with figure spaces (digit-wide) so the layout does not shift. */
 export const pad2 = (v) => String(v).padStart(2, "\u2007");
 
-const clampPct = (v) => Math.max(0, Math.min(100, Math.round(v)));
+export const clampPct = (v) => Math.max(0, Math.min(100, Math.round(v)));
 
 // ---- Linux ----
 export function parseProcStat(text) {
@@ -94,7 +94,7 @@ export function parseNvidiaSmi(text) {
   return { util: clampPct(f[0]), memUsed: f[1] * 2 ** 20, memTotal: f[2] * 2 ** 20, temp: Number.isFinite(f[3]) ? f[3] : null };
 }
 
-async function sh(exec, cmd, args, timeout = 4000) {
+export async function sh(exec, cmd, args, timeout = 4000) {
   try {
     const r = await exec(cmd, args, { timeout });
     return r.code === 0 ? r.stdout : null;
@@ -103,53 +103,25 @@ async function sh(exec, cmd, args, timeout = 4000) {
   }
 }
 
-/** Reads one snapshot. `prev` is the previous snapshot's raw counters (null on first call). */
-export async function readStats({ mac, exec, readTextFile, herdr: wantHerdr = true }, prev) {
+/** Reads one snapshot. `prev` is the previous snapshot (null on first call). `segments` are the enabled registry
+ * segments (segments/index.js); each `sample` adds its slice (cpu, mem, gpu, battery, ...). herdr, disk and net
+ * are not pluggable yet and stay inline. */
+export async function readStats(env, prev) {
+  const { mac, exec, readTextFile, herdr: wantHerdr = true, segments = [] } = env;
   const now = Date.now();
-  let cpuRaw = null;
-  let cpu = null;
-  let mem = null;
-  let net;
-  let disk;
-  let gpu = null;
-  let gpuMissing = prev?.gpuMissing ?? false;
-  if (!mac && !gpuMissing) {
-    const out = await sh(exec, "nvidia-smi", ["--query-gpu=utilization.gpu,memory.used,memory.total,temperature.gpu", "--format=csv,noheader,nounits"]);
-    gpu = parseNvidiaSmi(out);
-    if (out == null) gpuMissing = true; // no NVIDIA driver/binary: stop spawning
-  }
-  if (mac) {
-    const [top, vm, memsize, df, ns] = await Promise.all([
-      sh(exec, "top", ["-l", "2", "-n", "0", "-s", "1"], 6000),
-      sh(exec, "vm_stat", []),
-      sh(exec, "sysctl", ["-n", "hw.memsize"]),
-      sh(exec, "df", ["-k", "/System/Volumes/Data"]).then((o) => o ?? sh(exec, "df", ["-k", "/"])),
-      sh(exec, "netstat", ["-ib"]),
-    ]);
-    cpu = parseTopCpu(top);
-    mem = parseVmStat(vm, Number(memsize));
-    disk = parseDf(df);
-    net = parseNetstatIb(ns);
-  } else {
-    const [stat, mi, df, nd] = await Promise.all([
-      readTextFile("/proc/stat"),
-      readTextFile("/proc/meminfo"),
-      sh(exec, "df", ["-kP", "/"]),
-      readTextFile("/proc/net/dev"),
-    ]);
-    cpuRaw = parseProcStat(stat);
-    if (cpuRaw && prev?.cpuRaw && cpuRaw.total > prev.cpuRaw.total) {
-      cpu = clampPct((1 - (cpuRaw.idle - prev.cpuRaw.idle) / (cpuRaw.total - prev.cpuRaw.total)) * 100);
-    }
-    mem = parseMeminfo(mi);
-    disk = parseDf(df);
-    net = nd ? parseProcNetDev(nd) : null;
-  }
-  const herdr = !wantHerdr ? null : parseHerdrTree(await sh(exec, "ps", mac ? ["-Aeo", "pid,ppid,rss,command"] : ["-eo", "pid,ppid,rss,args"]));
+  const [slices, df, nd, ps] = await Promise.all([
+    Promise.all(segments.map((seg) => seg.sample?.(env, prev))),
+    mac ? sh(exec, "df", ["-k", "/System/Volumes/Data"]).then((o) => o ?? sh(exec, "df", ["-k", "/"])) : sh(exec, "df", ["-kP", "/"]),
+    mac ? sh(exec, "netstat", ["-ib"]) : readTextFile("/proc/net/dev"),
+    wantHerdr ? sh(exec, "ps", mac ? ["-Aeo", "pid,ppid,rss,command"] : ["-eo", "pid,ppid,rss,args"]) : null,
+  ]);
+  const disk = parseDf(df);
+  const net = mac ? parseNetstatIb(nd) : nd ? parseProcNetDev(nd) : null;
+  const herdr = wantHerdr ? parseHerdrTree(ps) : null;
   const dt = prev?.net && net ? (now - prev.at) / 1000 : 0;
   const down = dt > 0 ? Math.max(0, (net.rx - prev.net.rx) / dt) : 0;
   const up = dt > 0 ? Math.max(0, (net.tx - prev.net.tx) / dt) : 0;
-  return { at: now, cpuRaw, net: net ?? prev?.net ?? null, cpu, mem, disk, down, up, gpu, gpuMissing, herdr };
+  return Object.assign({ at: now, net: net ?? prev?.net ?? null, disk, down, up, herdr }, ...slices);
 }
 
 // ---- history (sparklines) ----
