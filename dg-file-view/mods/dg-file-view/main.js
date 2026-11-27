@@ -141,6 +141,10 @@ function countOccurrences(text, q) {
   return n;
 }
 
+// Up to this many blocks the preview is one plain scroll area (every block laid out as it really is, so a
+// search changes no spacing and keeps the scroll position); past it, a lazy list.
+const MD_PLAIN_MAX = 600;
+
 const HIT_BG = "#fde047";
 const HIT_CUR_BG = "#fb923c";
 const HIT_FG = "#1c1917";
@@ -437,6 +441,7 @@ export default class FileView extends View {
     this.fileMatches = [];
     this.fileMatchIdx = 0;
     this.mdScroll = VirtualListScrollHandle.new();
+    this.mdPlain = ScrollHandle.new();
     this.codeScroll = VirtualListScrollHandle.new();
     this.searchLines = [];
     this.mdBlocks = [];
@@ -1783,7 +1788,7 @@ export default class FileView extends View {
   showFileMatch(cx) {
     if (this.inMdPreview()) {
       const m = this.fileMatches[this.fileMatchIdx];
-      if (m) this.mdScroll?.scroll_to_item(m.block);
+      if (m) (this.mdBlocks.length <= MD_PLAIN_MAX ? this.mdPlain : this.mdScroll)?.scroll_to_item(m.block);
       cx.notify();
       return;
     }
@@ -1904,7 +1909,15 @@ export default class FileView extends View {
   // fails, the block stays as code with the error underneath.
   renderMdBlock(block, i, cx) {
     const code = mermaidCode(block);
-    if (code === null) return codeCard(block, theme()) ?? TextView.markdown(`fv-md-${this.slotId}-p${i}`, block);
+    if (code === null) {
+      const t = theme();
+      const q = this.fileSearchOpen ? this.fileSearchQuery.trim().toLowerCase() : "";
+      if (q && this.mdHitCache?.q === q && this.mdHitCache.hits[i]) {
+        const cur = this.fileMatches[this.fileMatchIdx];
+        const local = cur && cur.block === i ? cur.local : -1;
+        return codeCard(block, t, q, local) ?? renderMdMatchBlock(block, q, local, t);
+      }
+      return codeCard(block, t) ?? TextView.markdown(`fv-md-${this.slotId}-p${i}`, block);
     if (!this.mermaidCache) this.mermaidCache = new Map();
     // Drawn in the theme's colors so the PNG blends with the preview instead of a white card.
     const t = theme();
@@ -2000,6 +2013,34 @@ export default class FileView extends View {
     }
     const blocks = this.mdBlocks;
     const id = `fv-md-list-${this.slotId}`;
+    if (blocks.length <= MD_PLAIN_MAX) {
+      const q = this.fileSearchOpen ? this.fileSearchQuery.trim().toLowerCase() : "";
+      return v_flex()
+        .relative()
+        .flex_1()
+        .min_h(0)
+        .child(
+          v_flex()
+            .id(id)
+            .size_full()
+            .overflow_y_scroll()
+            .track_scroll(this.mdPlain)
+            .children(
+              blocks.map((b, i) => {
+                const ready = this.mermaidReady(b);
+                const cur = this.fileMatches[this.fileMatchIdx];
+                return div()
+                  // The key carries what changes the look, so a hit block is redrawn when the query or the current hit moves.
+                  .id(`fv-md-blk-${i}-${q && this.mdHitCache?.hits?.[i] ? q : ""}-${cur && cur.block === i ? cur.local : ""}`)
+                  .px(20)
+                  .py(6)
+                  .when(Boolean(ready), (el) => el.cursor_pointer().on_click((_e, cx) => this.showMermaid(this.readyDiagrams().indexOf(ready), cx)))
+                  .child(this.renderMdBlock(b, i, cx));
+              }),
+            ),
+        )
+        .child(Scrollbar.vertical(id).absolute().inset_0());
+    }
     return v_flex()
       .relative()
       .flex_1()
@@ -2138,6 +2179,8 @@ export default class FileView extends View {
     this.fileSearchInput = null;
     this.mdScroll?.release();
     this.mdScroll = null;
+    this.mdPlain?.release();
+    this.mdPlain = null;
     this.codeScroll?.release();
     this.codeScroll = null;
     this.audioSeekSlider?.release();
@@ -2680,7 +2723,7 @@ export default class FileView extends View {
             : isSvg && this.svgPreview
               ? renderImageView(this, slot, fullPath, t)
               : this.mdPreview && this.markdownText
-                ? this.fileSearchOpen && this.fileSearchQuery.trim()
+                ? this.fileSearchOpen && this.fileSearchQuery.trim() && this.mdBlocks.length > MD_PLAIN_MAX
                   ? this.renderMdSearchView(t)
                   : this.renderMdPreview(cx, slot, fullPath)
                 : this.code && this.fileSearchOpen && this.fileSearchQuery.trim()

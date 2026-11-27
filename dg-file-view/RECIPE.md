@@ -71,6 +71,7 @@ Sibling mods: `dg-file-view` provides the tab; `dg-changes`, `dg-file-picker`, `
 - The slot must exist in `file-view.slots` before `tab.new`; a bare `tab.new` without `slotId`/`path`/`root` props shows "File no longer open".
 - Icons come from shipped mods `changes`, `files`, `workspace-chrome`; if one is missing the icon is blank.
 - Markdown/code search redraws the view by hand because the editor cannot highlight or scroll to matches; the markdown match renderer handles only headings, lists, quotes, tables, bold and inline code.
+- Markdown search: up to 600 blocks the preview is one plain scroll area (`ScrollHandle`, every block laid out as it really is), and a search only repaints the blocks with hits in place, so nothing shifts and closing the search keeps the scroll position; Prev/Next `scroll_to_item` the hit's block. Past 600 blocks it falls back to a lazy `list`, and a search switches to a separate fixed-height list that restarts at the top.
 - The Markdown view draws no color, collapsing details, real footnotes or definition lists itself; code cards and `mdPrep` stand in for them. Inline text stays uncolored.
 - Mermaid needs `mmdr` (a Rust program, no browser): `cargo install mermaid-rs-renderer`, or `brew tap 1jehuang/mmdr && brew install mmdr`. It is looked up on `PATH`, then `~/.cargo/bin`, `/opt/homebrew/bin`, `/usr/local/bin`, `~/.local/bin`. Without it diagrams stay as code. There is no other renderer.
 - Video preview is frames only: no playback, no sound.
