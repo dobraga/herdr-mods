@@ -13,7 +13,7 @@ Top to bottom, filling the tab (background = theme `background`, text 13px):
 - Find bar, 38px, `chrome` background: search icon, 320px max input, "n / total" or "No matches", Prev, Next, x.
 - Body, one of:
   - Code: a code editor (13px, the app font, syntax colors from theme ansi colors). While searching, a hand-drawn line list (20px rows, 40px line-number gutter, matches `#fde047`, current match `#fb923c`, text `#1c1917`).
-  - Markdown preview: lazily rendered blocks (20px side padding). With a search active, blocks that contain hits are redrawn by hand (headings, lists, quotes, tables, bold, inline code) with the same highlight colors.
+  - Markdown preview: lazily rendered blocks (20px side padding). A ```` ```mermaid ```` block is drawn as a PNG made by `mmdr` (cached by hash, in the theme's colors, shown in a box of at most 900x480; click opens a zoom view with Prev/Next across the page's diagrams). Until it is ready, or if it fails, the block stays as code with `mermaid: <error>` under it. With a search active, blocks that contain hits are redrawn by hand (headings, lists, quotes, tables, bold, inline code) with the same highlight colors.
   - Diff: 22px rows, hunk header rows on `raised`, 36px line-number gutter, `+` rows tinted ansi2 and `-` rows tinted ansi1 (default 10% alpha), light per-line syntax coloring, horizontal scroll (width capped at 4000px).
   - Image / SVG: image in a bordered 8px-radius stage, bottom 38px toolbar: Fit, 100%, -, +, zoom %, "w x h", format, size, Reveal in Files, Copy path.
   - Audio: 640px max card with 72px cover (or file icon), title, artist/album, codec/sample rate/channels/bitrate/size, a 72-bar waveform, seek slider, -10s / Play / +10s, speed, Vol/Muted, volume slider, hint "Space: Play/Pause".
@@ -71,6 +71,7 @@ Sibling mods: `dg-file-view` provides the tab; `dg-changes`, `dg-file-picker`, `
 - The slot must exist in `file-view.slots` before `tab.new`; a bare `tab.new` without `slotId`/`path`/`root` props shows "File no longer open".
 - Icons come from shipped mods `changes`, `files`, `workspace-chrome`; if one is missing the icon is blank.
 - Markdown/code search redraws the view by hand because the editor cannot highlight or scroll to matches; the markdown match renderer handles only headings, lists, quotes, tables, bold and inline code.
+- Mermaid needs `mmdr` (a Rust program, no browser): `cargo install mermaid-rs-renderer`, or `brew tap 1jehuang/mmdr && brew install mmdr`. It is looked up on `PATH`, then `~/.cargo/bin`, `/opt/homebrew/bin`, `/usr/local/bin`, `~/.local/bin`. Without it diagrams stay as code. There is no other renderer.
 - Video preview is frames only: no playback, no sound.
 - Closing the view quits the audio daemon; it also quits on its own after 10 idle minutes.
 - `checking()` is true during `herdr-app check`; the mod must skip loading then.

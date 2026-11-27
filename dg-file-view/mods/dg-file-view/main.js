@@ -1786,7 +1786,7 @@ export default class FileView extends View {
     cx.notify();
   }
 
-  // A ```mermaid block draws as a rendered PNG (mmdc, cached by hash); until it is ready, or if it
+  // A ```mermaid block draws as a rendered PNG (mmdr, cached by hash); until it is ready, or if it
   // fails, the block stays as code with the error underneath.
   renderMdBlock(block, i, cx) {
     const code = mermaidCode(block);
@@ -1812,7 +1812,7 @@ export default class FileView extends View {
     }
     if (entry.state === "ok") {
       // Fit every diagram in the same box (900x480, scaled down only) so a tall one and a wide one
-      // read at a similar size; the PNG may be rendered at 2x (mmdc). Zoom shows it at full size.
+      // read at a similar size; the PNG carries a `scale` (1 for mmdr). Zoom shows it at full size.
       const lw = entry.width / (entry.scale || 1);
       const lh = entry.height / (entry.scale || 1);
       const k = Math.min(1, 900 / lw, 480 / lh);

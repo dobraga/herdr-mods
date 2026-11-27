@@ -840,26 +840,24 @@ def png_dimensions(path):
     with open(path, "rb") as f:
         head = f.read(24)
     if head[:8] != b"\x89PNG\r\n\x1a\n":
-        raise RuntimeError("mmdc did not produce a PNG")
+        raise RuntimeError("mmdr did not produce a PNG")
     return int.from_bytes(head[16:20], "big"), int.from_bytes(head[20:24], "big")
 
 
 def cmd_mermaid(cache_dir, code, theme_json=None):
-    # mmdr (Rust, no browser, preferred) renders 1x; mmdc (mermaid-cli) is the fallback, rendered at 2x.
+    # mmdr (Rust, no browser): cargo install mermaid-rs-renderer. Renders at 1x.
     mmdr = find_tool("mmdr")
-    mmdc = None if mmdr else find_tool("mmdc")
-    if not mmdr and not mmdc:
-        raise RuntimeError("no mermaid renderer: brew tap 1jehuang/mmdr && brew install mmdr")
-    scale = 1 if mmdr else 2
+    if not mmdr:
+        raise RuntimeError("mmdr not found: cargo install mermaid-rs-renderer")
+    scale = 1
     os.makedirs(cache_dir, exist_ok=True)
-    tool = "mmdr" if mmdr else "mmdc"
     colors = {}
     if theme_json:
         try:
             colors = json.loads(theme_json)
         except ValueError:
             colors = {}
-    key = hashlib.sha1((f"mermaid-v4|{tool}|{sorted(colors.items())}|" + code).encode("utf-8")).hexdigest()[:14]
+    key = hashlib.sha1((f"mermaid-v5|{sorted(colors.items())}|" + code).encode("utf-8")).hexdigest()[:14]
     out_name = f"{key}-mermaid.png"
     out_path = os.path.join(cache_dir, out_name)
     if os.path.exists(out_path) and os.path.getsize(out_path) > 0:
@@ -870,44 +868,41 @@ def cmd_mermaid(cache_dir, code, theme_json=None):
             with open(src, "w", encoding="utf-8") as f:
                 f.write(code)
             bg = colors.get("background", "white")
-            if mmdr:
-                cmd = [mmdr, "-i", src, "-o", out_path, "-e", "png"]
-                if colors:
-                    cfg = os.path.join(tmp, "c.json")
-                    with open(cfg, "w", encoding="utf-8") as f:
-                        json.dump({"themeVariables": {
-                            "background": bg,
-                            "primaryColor": colors.get("raised", bg),
-                            "primaryTextColor": colors.get("foreground", "#222"),
-                            "primaryBorderColor": colors.get("border", "#888"),
-                            "lineColor": colors.get("muted", "#888"),
-                            "secondaryColor": colors.get("chrome", bg),
-                            "tertiaryColor": colors.get("chrome", bg),
-                            "edgeLabelBackground": bg,
-                            "clusterBkg": colors.get("chrome", bg),
-                            "clusterBorder": colors.get("border", "#888"),
-                            # sequence diagrams ignore primaryColor and need their own variables
-                            "actorBkg": colors.get("raised", bg),
-                            "actorBorder": colors.get("border", "#888"),
-                            "actorTextColor": colors.get("foreground", "#222"),
-                            "actorLineColor": colors.get("muted", "#888"),
-                            "signalColor": colors.get("foreground", "#222"),
-                            "signalTextColor": colors.get("foreground", "#222"),
-                            "noteBkgColor": colors.get("raised", bg),
-                            "noteTextColor": colors.get("foreground", "#222"),
-                            "noteBorderColor": colors.get("border", "#888"),
-                            "labelBoxBkgColor": colors.get("raised", bg),
-                            "labelTextColor": colors.get("foreground", "#222"),
-                            "sequenceNumberColor": bg,
-                        }}, f)
-                    cmd += ["-c", cfg]
-            else:
-                cmd = [mmdc, "-i", src, "-o", out_path, "-b", bg, "-s", "2"]
+            cmd = [mmdr, "-i", src, "-o", out_path, "-e", "png"]
+            if colors:
+                cfg = os.path.join(tmp, "c.json")
+                with open(cfg, "w", encoding="utf-8") as f:
+                    json.dump({"themeVariables": {
+                        "background": bg,
+                        "primaryColor": colors.get("raised", bg),
+                        "primaryTextColor": colors.get("foreground", "#222"),
+                        "primaryBorderColor": colors.get("border", "#888"),
+                        "lineColor": colors.get("muted", "#888"),
+                        "secondaryColor": colors.get("chrome", bg),
+                        "tertiaryColor": colors.get("chrome", bg),
+                        "edgeLabelBackground": bg,
+                        "clusterBkg": colors.get("chrome", bg),
+                        "clusterBorder": colors.get("border", "#888"),
+                        # sequence diagrams ignore primaryColor and need their own variables
+                        "actorBkg": colors.get("raised", bg),
+                        "actorBorder": colors.get("border", "#888"),
+                        "actorTextColor": colors.get("foreground", "#222"),
+                        "actorLineColor": colors.get("muted", "#888"),
+                        "signalColor": colors.get("foreground", "#222"),
+                        "signalTextColor": colors.get("foreground", "#222"),
+                        "noteBkgColor": colors.get("raised", bg),
+                        "noteTextColor": colors.get("foreground", "#222"),
+                        "noteBorderColor": colors.get("border", "#888"),
+                        "labelBoxBkgColor": colors.get("raised", bg),
+                        "labelTextColor": colors.get("foreground", "#222"),
+                        "sequenceNumberColor": bg,
+                    }}, f)
+                cmd += ["-c", cfg]
             res = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=60)
         if res.returncode != 0 or not os.path.exists(out_path) or os.path.getsize(out_path) == 0:
             if os.path.exists(out_path):
                 os.remove(out_path)
-            raise RuntimeError((res.stderr or res.stdout).strip()[:300] or f"{tool} failed")
+            raise RuntimeError((res.stderr or res.stdout).strip()[:300] or "mmdr failed")
     w, h = png_dimensions(out_path)
     prune_cache(cache_dir)
     return {"relPath": rel_cache_path(out_name), "width": w, "height": h, "scale": scale}

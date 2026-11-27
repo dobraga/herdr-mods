@@ -55,6 +55,10 @@ This links the mod into `~/.config/herdr-app/mods`; `git pull` updates it. The f
 
 See [RECIPE.md](RECIPE.md) for how it is built.
 
+## Mermaid diagrams
+
+The Markdown preview draws ```` ```mermaid ```` blocks with [`mmdr`](https://github.com/1jehuang/mermaid-rs-renderer), a Rust program with no browser: `cargo install mermaid-rs-renderer`. Without it, diagrams stay as code.
+
 ## Test file
 
 `samples/markdown-test.md` exercises the Markdown preview: text styles, nested lists, task lists, tables, code blocks, Mermaid diagrams, images, HTML and footnotes. Open it in a file view and use Ctrl+F.
