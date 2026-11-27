@@ -1771,8 +1771,7 @@ export default class FileView extends View {
     return (this.mdBlocks || []).map((b) => this.mermaidReady(b)).filter(Boolean);
   }
 
-  // Zoom opens from the toolbar, not from the list: an interactive element inside a list row made
-  // the diagram disappear.
+  // Opened by clicking a diagram (the list's on_item_click); Prev/Next and arrows switch.
   showMermaid(idx, cx) {
     const list = this.readyDiagrams();
     if (!list.length) return;
@@ -2333,10 +2332,7 @@ export default class FileView extends View {
                 .border(1)
                 .border_color(t.border)
                 .child(chip("fv-md-code", "Code", !this.mdPreview, (_e, cx) => { this.mdPreview = false; cx.notify(); }))
-                .child(chip("fv-md-prev", "Preview", this.mdPreview, (_e, cx) => { this.mdPreview = true; cx.notify(); }))
-                .when(this.mdPreview && this.readyDiagrams().length > 0, (g) =>
-                  g.child(chip("fv-md-zoom", "Diagrams", Boolean(this.mermaidZoom), (_e, cx) => this.showMermaid(this.mermaidIdx ?? 0, cx))),
-                ),
+                .child(chip("fv-md-prev", "Preview", this.mdPreview, (_e, cx) => { this.mdPreview = true; cx.notify(); })),
             ),
           )
           .when(isSvg, (el) =>
