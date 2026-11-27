@@ -330,6 +330,17 @@ function codeCard(block, t, q = "", currentLocal = -1) {
 
 export default class FileView extends View {
   init(_props, cx) {
+    // The code Editor takes Ctrl/Cmd+F before the key reaches this view's key handler, so bind it as an action
+    // in the Editor's own context; on_action on the root below opens the search bar. Once per app.
+    if (!globalThis.__fvFindBound) {
+      globalThis.__fvFindBound = true;
+      try {
+        cx.bind_keys([
+          { keystroke: "ctrl-f", action: "fv-find", context: "Editor" },
+          { keystroke: "cmd-f", action: "fv-find", context: "Editor" },
+        ]);
+      } catch {}
+    }
     const p = props() ?? {};
     this.slotId = p.slotId ?? null;
     this.beforeTabs = Array.isArray(p.beforeTabs) ? new Set(p.beforeTabs) : null;
@@ -2281,6 +2292,9 @@ export default class FileView extends View {
       .bg(t.background)
       .text_color(t.foreground)
       .text_size(13)
+      .on_action("fv-find", (_e, cx) => {
+        if (mode === "file" && !showingOpenWith && !this.mediaMode && this.code) this.openFileSearch(cx);
+      })
       .on_key_down((e, cx) => {
         const k = e.key?.toLowerCase();
         if (this.mermaidZoom) {
