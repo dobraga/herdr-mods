@@ -1836,13 +1836,24 @@ export default class FileView extends View {
   }
 
   closeFileSearch(cx) {
-    // The Editor cannot be scrolled from code and restarts at the top when it comes back: park its cursor on the
-    // match you were on, which it scrolls into view.
-    const m = this.fileSearchOpen && this.fileSearchQuery.trim() ? this.fileMatches[this.fileMatchIdx] : null;
-    if (m && this.code && !this.inMdPreview()) {
-      let off = 0;
-      for (let i = 0; i < m.line; i++) off += (this.searchLines[i] ?? "").length + 1;
-      try { this.code.set_selected_range({ start: off + m.col, end: off + m.col }); } catch {}
+    // The Editor cannot be scrolled from code, restarts at the top when it comes back and only scrolls the
+    // minimum to show its cursor. So park the cursor on the last line the search list shows (which puts the list's
+    // top line at the top), then move it onto the current match once that is in view.
+    if (this.fileSearchOpen && this.fileSearchQuery.trim() && this.code && !this.inMdPreview()) {
+      const lines = this.searchLines;
+      const top = Math.max(0, Math.round((this.codeScroll?.offset()?.y ?? 0) / 20));
+      const rows = Math.max(1, Math.floor((this.codeScroll?.viewport_size()?.height ?? 0) / 21));
+      const bottom = Math.min(lines.length - 1, top + rows - 1);
+      const at = (line, col = 0) => { let o = 0; for (let i = 0; i < line; i++) o += (lines[i] ?? "").length + 1; return o + col; };
+      const place = (o) => { try { this.code?.set_selected_range({ start: o, end: o }); } catch {} };
+      place(at(bottom));
+      const m = this.fileMatches[this.fileMatchIdx];
+      if (m && m.line >= top && m.line <= bottom)
+        cx.spawn(async (cx) => {
+          try { await exec("sleep", ["0.08"]); } catch {}
+          place(at(m.line, m.col));
+          cx.notify();
+        });
     }
     this.fileSearchOpen = false;
     this.focusHandle.focus();
