@@ -145,8 +145,8 @@ function countOccurrences(text, q) {
 // search changes no spacing and keeps the scroll position); past it, a lazy list.
 const MD_PLAIN_MAX = 600;
 
-// The code Editor's line height (13px font): the search list uses the same, so rows and scroll positions line up.
-const CODE_ROW = 20.8;
+// The code Editor's line height (13px font; measured from screenshots: 23.03px for a 22.0px row of 20): the search list uses the same, so rows and scroll positions line up.
+const CODE_ROW = 20.94;
 
 const HIT_BG = "#fde047";
 const HIT_CUR_BG = "#fb923c";
@@ -1905,8 +1905,8 @@ export default class FileView extends View {
         .w_full()
         .h(CODE_ROW)
         .flex_none()
-        .gap(20)
-        .pl(5)
+        .gap(23.5)
+        .pl(1.5)
         .pr(8)
         .items_center()
         .child(div().w(numW).flex_none().text_right().text_color(t.dim).child(String(i + 1)))
