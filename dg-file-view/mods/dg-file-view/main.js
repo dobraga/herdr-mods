@@ -331,15 +331,13 @@ function codeCard(block, t, q = "", currentLocal = -1) {
 export default class FileView extends View {
   init(_props, cx) {
     // The code Editor takes Ctrl/Cmd+F before the key reaches this view's key handler, so bind it as an action
-    // in the Editor's own context; on_action on the root below opens the search bar. Once per app.
-    if (!globalThis.__fvFindBound) {
-      globalThis.__fvFindBound = true;
-      try {
-        cx.bind_keys([
-          { keystroke: "ctrl-f", action: "fv-find", context: "Editor" },
-          { keystroke: "cmd-f", action: "fv-find", context: "Editor" },
-        ]);
-      } catch {}
+    // in the Editor's contexts; on_action on the root below opens the search bar. Once per app. Never bound
+    // globally: that would also eat Ctrl+F in terminals and report "unknown command" elsewhere.
+    if (!globalThis.__fvFindBound3) {
+      globalThis.__fvFindBound3 = true;
+      for (const context of ["Editor", "Input", "CodeEditor"])
+        for (const keystroke of ["ctrl-f", "cmd-f"])
+          try { cx.bind_keys([{ keystroke, action: "fv-find", context }]); } catch {}
     }
     const p = props() ?? {};
     this.slotId = p.slotId ?? null;
