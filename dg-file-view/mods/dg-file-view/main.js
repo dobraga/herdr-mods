@@ -2,7 +2,7 @@
 import { View, div, svg, list, image } from "gpui-kit";
 import { v_flex, h_flex, Editor, EditorState, TextView, Scrollbar, v_virtual_list, Input, InputState, SliderState, ScrollHandle, VirtualListScrollHandle } from "gpui-base";
 import { props, shared, setShared, spaces, panes, focused, run, exec, readTextFile, writeTextFile, watchFolder, theme, settings, home, checking, notify } from "herdr";
-import { colorRows, languageByTag, tokenize } from "./syntax.js";
+import { colorRows, languageByTag, languageOf, tokenize } from "./syntax.js";
 import { inspectFile, launchApp, setDefaultApp, revealInFolder, visibleApps, renderOpenWithScreen } from "./open-with-ui.js";
 import {
   AUDIO_RATES,
@@ -275,6 +275,27 @@ function renderMdMatchBlock(block, q, currentLocal, t) {
   return col;
 }
 
+const syntaxTone = (t) => ({ keyword: t.ansi5, string: t.ansi2, comment: t.dim, function: t.ansi4, type: t.ansi3, number: t.ansi6, constant: t.ansi6 });
+
+// Adds a line's syntax-colored tokens to `row`, with search hits ({a, b, cur}: column range) painted over them.
+function paintLine(row, tokens, ranges, tone, t) {
+  let at = 0;
+  for (const k of tokens) {
+    const color = k.color ?? tone[k.kind] ?? t.foreground;
+    let pos = 0;
+    for (const r of ranges) {
+      const a = Math.max(r.a - at, pos), b = Math.min(r.b - at, k.text.length);
+      if (b <= a) continue;
+      if (a > pos) row.child(div().flex_none().text_color(color).child(k.text.slice(pos, a)));
+      row.child(div().flex_none().rounded(2).bg(r.cur ? HIT_CUR_BG : HIT_BG).text_color(HIT_FG).child(k.text.slice(a, b)));
+      pos = b;
+    }
+    if (pos < k.text.length) row.child(div().flex_none().text_color(color).child(k.text.slice(pos)));
+    at += k.text.length;
+  }
+  return row;
+}
+
 // A fenced code block drawn by hand in syntax colors (the Markdown view cannot color text), with the
 // search hits painted over it (`currentLocal` is the current hit's number in this block); null when it
 // is not one, so the caller falls back to the plain view.
@@ -283,7 +304,7 @@ function codeCard(block, t, q = "", currentLocal = -1) {
   if (!body) return null;
   const { tag, rows } = body;
   const lang = languageByTag(tag);
-  const tone = { keyword: t.ansi5, string: t.ansi2, comment: t.dim, function: t.ansi4, type: t.ansi3, number: t.ansi6, constant: t.ansi6 };
+  const tone = syntaxTone(t);
   let open = null, hit = 0;
   const lines = rows.map((text) => {
     let tokens = null;
@@ -295,21 +316,7 @@ function codeCard(block, t, q = "", currentLocal = -1) {
     }
     tokens ??= [{ kind: "", text }];
     const ranges = hitRanges(text, q).map(([a, b]) => ({ a, b, cur: hit++ === currentLocal }));
-    const row = h_flex().flex_none().whitespace_nowrap().min_h(18);
-    let at = 0;
-    for (const k of tokens) {
-      const color = k.color ?? tone[k.kind] ?? t.foreground;
-      let pos = 0;
-      for (const r of ranges) {
-        const a = Math.max(r.a - at, pos), b = Math.min(r.b - at, k.text.length);
-        if (b <= a) continue;
-        if (a > pos) row.child(div().flex_none().text_color(color).child(k.text.slice(pos, a)));
-        row.child(div().flex_none().rounded(2).bg(r.cur ? HIT_CUR_BG : HIT_BG).text_color(HIT_FG).child(k.text.slice(a, b)));
-        pos = b;
-      }
-      if (pos < k.text.length) row.child(div().flex_none().text_color(color).child(k.text.slice(pos)));
-      at += k.text.length;
-    }
+    const row = paintLine(h_flex().flex_none().whitespace_nowrap().min_h(18), tokens, ranges, tone, t);
     return text ? row : row.child(" ");
   });
   return v_flex()
@@ -1826,6 +1833,24 @@ export default class FileView extends View {
     cx.notify();
   }
 
+  // Syntax tokens for every line of the file being searched (block comments carry over), cached per lines array.
+  // Null when the language is unknown or the file is huge: the lines are then drawn plain.
+  codeTokensFor(lines, path) {
+    if (this.codeTok?.lines === lines) return this.codeTok.tokens;
+    const lang = languageOf(path);
+    let tokens = null;
+    if (lang && lines.length <= 20000) {
+      tokens = [];
+      let open = null;
+      for (const l of lines) {
+        if (l.length > 400) { tokens.push(null); continue; }
+        try { const r = tokenize(l, lang, open); open = r.open; tokens.push(r.tokens); } catch { tokens.push(null); }
+      }
+    }
+    this.codeTok = { lines, tokens };
+    return tokens;
+  }
+
   // While searching code, draw lines ourselves (the Editor cannot show or scroll to a match).
   renderCodeSearchView(t) {
     const q = this.fileSearchQuery.toLowerCase();
@@ -1837,18 +1862,13 @@ export default class FileView extends View {
       if (!byLine.has(m.line)) byLine.set(m.line, []);
       byLine.get(m.line).push({ col: m.col, cur: idx === this.fileMatchIdx });
     });
+    const tokens = this.codeTokensFor(lines, this.slot()?.path);
+    const tone = syntaxTone(t);
     const row = (i) => {
       const text = lines[i] ?? "";
-      const body = h_flex().flex_1().min_w(0).whitespace_nowrap();
-      let pos = 0;
-      for (const h of byLine.get(i) ?? []) {
-        if (h.col > pos) body.child(div().child(text.slice(pos, h.col)));
-        body.child(
-          div().bg(h.cur ? HIT_CUR_BG : HIT_BG).text_color(HIT_FG).child(text.slice(h.col, h.col + q.length)),
-        );
-        pos = h.col + q.length;
-      }
-      if (pos < text.length || pos === 0) body.child(div().child(text.slice(pos) || " "));
+      const ranges = (byLine.get(i) ?? []).map((h) => ({ a: h.col, b: h.col + q.length, cur: h.cur }));
+      const body = paintLine(h_flex().flex_1().min_w(0).whitespace_nowrap(), tokens?.[i] ?? [{ kind: "", text }], ranges, tone, t);
+      if (!text) body.child(div().child(" "));
       return h_flex()
         .w_full()
         .h(20)
