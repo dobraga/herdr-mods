@@ -1918,6 +1918,7 @@ export default class FileView extends View {
         return codeCard(block, t, q, local) ?? renderMdMatchBlock(block, q, local, t);
       }
       return codeCard(block, t) ?? TextView.markdown(`fv-md-${this.slotId}-p${i}`, block);
+    }
     if (!this.mermaidCache) this.mermaidCache = new Map();
     // Drawn in the theme's colors so the PNG blends with the preview instead of a white card.
     const t = theme();
