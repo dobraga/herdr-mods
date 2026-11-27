@@ -189,7 +189,7 @@ export default class Agents extends View {
     const on = k.address === shown;
     return h_flex()
       .id(`sub-${k.address}`)
-      .pl(39)
+      .pl(14)
       .pr(8)
       .rounded(8)
       .h(26)
@@ -200,12 +200,13 @@ export default class Agents extends View {
       .when(on, (el) => el.bg(t.raised))
       .hover((s) => s.bg(t.hover))
       .on_click(() => (this.listed.has(k.address) ? run("pane.focus", { terminal: k.address }) : this.peek(k.address)))
-      .children(s.lines.map(l => div().self_start().mt(-4).w(9).h(17).mr(4).flex_none()
-        .when(Boolean(l), el => el.border_l(1.5).border_color(t.input))
-        .when(l === "└" || l === "├", el => el.border_b(1.5).rounded_bl(6))))
-      .when(Boolean(pic), el => el.child(div().mr(8).child(pic)))
+      .children(s.lines.map(l => div().flex_none().w(l === "└" || l === "├" ? 18 : 12).text_color(t.dim).child(l === "└" ? "\u2514\u2500" : l === "├" ? "\u251c\u2500" : l ? "\u2503" : "")))
+      .child(div().w(4).flex_none())
+      .when(Boolean(pic), el => el.child(div().relative().flex_none().mr(8).child(pic)
+        .when(st === "working", el => el.child(div().absolute().right(-4).bottom(-4).child(svg("mods/workspace-chrome/spinner.svg").size(10).flex_none().text_color(t.working).spin(900))))
+        .when(st === "done", el => el.child(div().absolute().right(-2).bottom(-2).size(7).rounded(4).bg(t.done).border(1).border_color(on ? t.raised : t.chrome)))))
       .child(div().flex_1().truncate().text_color(on ? t.foreground : t.muted).child(k.name || k.template || k.program?.name || k.address))
-      .child(this.status(t, { status: st }, compact));
+      .when(st === "blocked" || st === "idle" || !pic, el => el.child(this.status(t, { status: st }, compact)));
   }
 
   // compact: a ! for blocked where a header already says "Needs you".

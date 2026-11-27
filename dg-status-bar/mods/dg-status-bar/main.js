@@ -23,13 +23,17 @@ import {
   checking,
 } from "herdr";
 
-import { usageCard, formatReset, formatResetShort, paceOf, WINDOW_MS } from "./usage-card.js";
+import { usageCard } from "./usage-card.js";
 import { cfg, applySettings, usageColor } from "./usage-settings.js";
 import { mediaCard } from "./media-card.js";
 import { readPlayers, pickActive, signature, sendCommand, pillLabel } from "./media.js";
 import { resolveFocusedAgent } from "./agent-focus.js";
-import { readStats, readDetail, readDiskTop, pushHist, fmtRate, pad2 } from "./sysstats.js";
-import { sysCard } from "./sys-card.js";
+import { readStats, readDetail, readDiskTop, pushHist, fmtRate } from "./sysstats.js";
+import { sysCard, pillPct, systemItems, ui } from "./sys-card.js";
+import { SEGMENTS, describe } from "./segments/index.js";
+import usageSeg from "./segments/usage.js";
+
+const usageUi = { ...ui, usageColor };
 
 function findNode(node, id) {
   if (node?.id === id) return node;
@@ -74,52 +78,9 @@ function formatCurrency(minor, currency = "USD", exponent = 2) {
   return currency === "USD" ? `$${val.toFixed(2)}` : `${val.toFixed(2)} ${currency}`;
 }
 
-function pctColor(pct, t, ctx = false) {
-  const crit = ctx ? cfg.ctxCritical : cfg.critical;
-  const warn = ctx ? cfg.ctxWarn : cfg.warn;
-  return pct >= crit ? t.ansi1 : pct >= warn ? t.blocked : t.muted;
-}
-
-function gauge(pct, color, t, pace) {
-  if (cfg.style === "text") return null;
-  if (cfg.style === "bar") {
-    return div().w(26).h(4).flex_none().rounded(2).bg(t.raised).overflow_hidden().relative()
-      .child(div().h_full().w(Math.round((26 * Math.max(0, Math.min(100, pct))) / 100)).bg(color).rounded(2))
-      .when(pace != null && cfg.showPace, (el) => el.child(div().absolute().top(0).h_full().w(1).left(Math.round((25 * pace) / 100)).bg(t.foreground).opacity(0.8)));
-  }
-  const step = Math.max(0, Math.min(100, Math.round(pct / 5) * 5));
-  return div()
-    .size(12)
-    .flex_none()
-    .relative()
-    .child(svg("mods/dg-status-bar/rings/track.svg").size(12).absolute().top(0).left(0).text_color(t.raised))
-    .when(step > 0, (el) => el.child(svg(`mods/dg-status-bar/rings/arc-${step}.svg`).size(12).absolute().top(0).left(0).text_color(color)));
-}
-
-function brandIcon(name, t, loading) {
-  return svg(`mods/dg-status-bar/icons/${name}.svg`).size(name === "agy" ? 10 : 13).flex_none().text_color(loading ? t.working : t.muted);
-}
-
 async function loadSettings() {
   applySettings(await readTextFile(`${appHome()}/data/workspace-status-usage/settings.json`));
   setShared("usage.settings", { ...cfg });
-}
-
-function bucketUsed(b) {
-  if (!b) return null;
-  return Math.max(0, Math.min(100, Math.round(b.usedPct ?? 100 - (b.remainingPct ?? 100))));
-}
-
-function matchAgyGroup(groups, modelName) {
-  if (!groups?.length) return null;
-  const m = (modelName ?? "").toLowerCase();
-  if (m.includes("claude") || m.includes("gpt") || m.includes("oss")) {
-    return groups.find((g) => /claude|gpt/i.test(g.name)) ?? groups[0];
-  }
-  if (m.includes("argon")) {
-    return groups.find((g) => /argon/i.test(g.name)) ?? groups[0];
-  }
-  return groups.find((g) => /gemini models/i.test(g.name)) ?? groups[0];
 }
 
 async function readKeychainCredentials() {
@@ -244,6 +205,7 @@ export default class WorkspaceStatusUsage extends View {
     this.repoLoading = new Set();
     if (checking()) return;
     loadSettings();
+    setShared("status.segments", describe());
 
     setShared("usage.pillHovered", false);
     setShared("usage.cardHovered", false);
@@ -532,7 +494,7 @@ export default class WorkspaceStatusUsage extends View {
     this.sysBusy = true;
     cx.spawn(async () => {
       try {
-        const env = { mac: window()?.platform === "macos", exec, readTextFile, herdr: cfg.showHerdr };
+        const env = { mac: window()?.platform === "macos", exec, readTextFile, herdr: cfg.showHerdr, segments: SEGMENTS.filter((seg) => cfg[seg.key]) };
         const [s, detail] = await Promise.all([readStats(env, this.sysPrev), open && cfg.showProcs ? readDetail(env) : null]);
         this.sysPrev = s;
         this.sysHist = pushHist(this.sysHist, s);
@@ -547,8 +509,6 @@ export default class WorkspaceStatusUsage extends View {
 
   sysPill(s, t) {
     const icon = (name) => svg(`mods/dg-status-bar/icons/${name}.svg`).size(13).flex_none().text_color(t.dim);
-    const pct = (name, v) => h_flex().gap(5).items_center().child(icon(name))
-      .child(div().w(30).flex_none().text_right().text_color(v == null ? t.dim : pctColor(v, t)).child(v == null ? "\u2007–%" : `${pad2(v)}%`));
     const isOpen = Boolean(shared("sys.open"));
     const trigger = h_flex().id("status-sys").px(7).py(2).gap(12).items_center().rounded(5).cursor_pointer()
       .when(isOpen, (el) => el.bg(t.selected))
@@ -570,13 +530,12 @@ export default class WorkspaceStatusUsage extends View {
         } else if (shared("sys.pinned")) this.closeSysCard();
         else setShared("sys.pinned", true);
       })
-      .when(cfg.showCpu, (el) => el.child(pct("cpu", s.cpu)))
-      .when(cfg.showMem, (el) => el.child(pct("memory", s.mem)))
-      .when(cfg.showHerdr && Boolean(s.herdr), (el) => el.child(h_flex().gap(5).items_center().child(icon("herdr"))
-        .child(div().w(34).flex_none().text_right().child(`${(s.herdr.total / 2 ** 30).toFixed(1)}G`))))
-      .when(cfg.showDisk, (el) => el.child(pct("disk", s.disk)))
-      .when(cfg.showGpu && Boolean(s.gpu), (el) => el.child(pct("gpu", s.gpu.util)))
-      .when(cfg.showNet, (el) => el.child(h_flex().gap(5).items_center().child(icon("net")).child(div().w(34).flex_none().text_right().child(fmtRate(s.down))).child("/").child(div().w(34).flex_none().text_right().child(fmtRate(s.up)))));
+      .children(systemItems([
+        { order: 30, on: cfg.showHerdr && Boolean(s.herdr), el: () => h_flex().gap(5).items_center().child(icon("herdr"))
+          .child(div().w(34).flex_none().text_right().child(`${(s.herdr.total / 2 ** 30).toFixed(1)}G`)) },
+        { order: 40, on: cfg.showDisk, el: () => pillPct("disk", s.disk, t) },
+        { order: 70, on: cfg.showNet, el: () => h_flex().gap(5).items_center().child(icon("net")).child(div().w(34).flex_none().text_right().child(fmtRate(s.down))).child("/").child(div().w(34).flex_none().text_right().child(fmtRate(s.up))) },
+      ], (seg) => seg.pill?.(s, t, ui)));
     return Popup.new("sys-popup", trigger)
       .anchor("top_center")
       .when(isOpen, (el) =>
@@ -611,70 +570,6 @@ export default class WorkspaceStatusUsage extends View {
     const parts = b && b.keys.endsWith("--") ? [...b.keys.slice(0, -2).split("-"), "-"] : b?.keys.split("-");
     const key = parts && parts.map((p) => mod[p.toLowerCase()] ?? p.toUpperCase()).join("");
     return key ? `${key}  commands` : "commands";
-  }
-
-  pillItems(data, activeAgent, t) {
-    const live = shared("usage.settings");
-    if (live) Object.assign(cfg, live);
-    if (activeAgent?.kind === "claude") {
-      const items = [];
-      const ctx = this.ctxByTerm[activeAgent.term];
-      if (ctx?.agent === "claude" && typeof ctx.ctx_pct === "number") {
-        const p = Math.round(ctx.ctx_pct);
-        items.push({ label: `Ctx ${p}%`, pct: p, color: pctColor(p, t, true) });
-      }
-      const cl = data?.claude;
-      if (cl?.fiveHour) {
-        const p = Math.round(cl.fiveHour.utilization ?? 0);
-        items.push({ label: `5h ${p}%`, pct: p, reset: cl.fiveHour.resets_at, pace: paceOf(cl.fiveHour.resets_at, WINDOW_MS["5h"]), color: usageColor(p, paceOf(cl.fiveHour.resets_at, WINDOW_MS["5h"]), t, t.muted) });
-      }
-      if (cl?.sevenDay) {
-        const p = Math.round(cl.sevenDay.utilization ?? 0);
-        items.push({ label: `7d ${p}%`, pct: p, reset: cl.sevenDay.resets_at, pace: paceOf(cl.sevenDay.resets_at, WINDOW_MS["7d"]), color: usageColor(p, paceOf(cl.sevenDay.resets_at, WINDOW_MS["7d"]), t, t.muted) });
-      }
-      return { icon: "claude", items };
-    }
-
-    if (activeAgent?.kind === "agy") {
-      const items = [];
-      const ctx = this.ctxByTerm[activeAgent.term];
-      if (ctx?.agent === "agy" && typeof ctx.ctx_pct === "number") {
-        const p = Math.round(ctx.ctx_pct);
-        items.push({ label: `Ctx ${p}%`, pct: p, color: pctColor(p, t, true) });
-      }
-      const group = matchAgyGroup(data?.agy?.groups, ctx?.model);
-      if (group) {
-        const b5h = group.buckets.find((b) => b.window === "5h");
-        const bw = group.buckets.find((b) => b.window === "weekly");
-        const p5h = bucketUsed(b5h);
-        const pw = bucketUsed(bw);
-        if (p5h !== null) items.push({ label: `5h ${p5h}%`, pct: p5h, reset: b5h.resetTime, pace: paceOf(b5h.resetTime, WINDOW_MS["5h"]), color: usageColor(p5h, paceOf(b5h.resetTime, WINDOW_MS["5h"]), t, t.muted) });
-        if (pw !== null) items.push({ label: `W ${pw}%`, pct: pw, reset: bw.resetTime, pace: paceOf(bw.resetTime, WINDOW_MS.weekly), color: usageColor(pw, paceOf(bw.resetTime, WINDOW_MS.weekly), t, t.muted) });
-      }
-      return { icon: "agy", items };
-    }
-
-    const items = [];
-    const add = (icon, wins) => {
-      wins.filter(Boolean).forEach((w, i) => {
-        const pace = paceOf(w.reset, w.ms);
-        items.push({ icon: i === 0 ? icon : null, noSep: i > 0, label: `${w.label} ${w.p}%`, pct: w.p, pace, color: usageColor(w.p, pace, t, t.muted) });
-      });
-    };
-    const cl = data?.claude;
-    add("claude", [
-      cl?.fiveHour && { label: "5h", p: Math.round(cl.fiveHour.utilization ?? 0), reset: cl.fiveHour.resets_at, ms: WINDOW_MS["5h"] },
-      cl?.sevenDay && { label: "7d", p: Math.round(cl.sevenDay.utilization ?? 0), reset: cl.sevenDay.resets_at, ms: WINDOW_MS["7d"] },
-    ]);
-    const buckets = (data?.agy?.groups ?? []).flatMap((g) => g.buckets);
-    const worst = (window, label, ms) => {
-      const bs = buckets.filter((b) => b.window === window && bucketUsed(b) !== null);
-      if (!bs.length) return null;
-      const b = bs.reduce((m, x) => (bucketUsed(x) > bucketUsed(m) ? x : m));
-      return { label, p: bucketUsed(b), reset: b.resetTime, ms };
-    };
-    add("agy", [worst("5h", "5h", WINDOW_MS["5h"]), worst("weekly", "W", WINDOW_MS.weekly)]);
-    return { items };
   }
 
   maybeSyncForge(cx) {
@@ -856,7 +751,8 @@ export default class WorkspaceStatusUsage extends View {
     const list = agents();
     const needs = list.filter((a) => a.status === "blocked").length;
     const data = shared("usage.data");
-    const pill = this.pillItems(data, activeAgent, t);
+    const live = shared("usage.settings");
+    if (live) Object.assign(cfg, live);
     const isOpen = Boolean(shared("usage.open"));
     this.mediaCmdRef = (c) => ((this.dbg = "cmd " + c), setShared("media.cmdReq", { cmd: c, arg: null, n: Date.now() }));
     const media = shared("media.state");
@@ -913,16 +809,7 @@ export default class WorkspaceStatusUsage extends View {
           .when(needs > 0, (e2) => e2.child(div().text_color(t.blocked).child(`· ${needs} needs you`))),
       ))
       .when(cfg.showUsage, (el) => el.child(
-        Popup.new("usage-popup", h_flex()
-          .id("status-usage")
-          .px(7)
-          .py(2)
-          .gap(6)
-          .items_center()
-          .rounded(5)
-          .cursor_pointer()
-          .when(isOpen, (el) => el.bg(t.selected))
-          .hover((s) => s.bg(t.hover).text_color(t.foreground))
+        Popup.new("usage-popup", usageSeg.pill({ data, agent: activeAgent, ctx: this.ctxByTerm[activeAgent?.term], loading: shared("usage.loading"), open: isOpen }, t, usageUi)
           .on_mouse_move((e) => {
             this.pillRect = e.bounds;
           })
@@ -950,22 +837,7 @@ export default class WorkspaceStatusUsage extends View {
             } else {
               setShared("usage.pinned", true);
             }
-          })
-          .when(Boolean(pill.icon), (el) => el.child(brandIcon(pill.icon, t, shared("usage.loading"))))
-          .when(pill.items.length > 0, (el) =>
-            el.children(
-              pill.items.map((item, i) =>
-                h_flex()
-                  .gap(4)
-                  .items_center()
-                  .when((i > 0 || Boolean(pill.icon)) && !item.noSep, (el) => el.child(div().text_color(t.dim).child("·")))
-                  .when(Boolean(item.icon), (el) => el.child(brandIcon(item.icon, t, shared("usage.loading"))))
-                  .child(div().text_color(item.color).child(cfg.showPercent || cfg.style === "text" ? item.label : item.label.replace(/ ?\d+%$/, "")))
-                  .when(cfg.style !== "text", (el) => el.child(gauge(item.pct, item.color, t, item.pace)))
-                  .when(cfg.showReset && Boolean(item.reset), (el) => el.child(div().text_size(10.5).text_color(t.dim).child(`↻${formatResetShort(item.reset)}`))),
-              ),
-            ),
-          ))
+          }))
           .anchor("top_center")
           .when(isOpen, (el) =>
             el.content(
@@ -1033,7 +905,7 @@ export default class WorkspaceStatusUsage extends View {
             ),
           ),
       ))
-      .when(cfg.showSystem && Boolean(sys) && (cfg.showCpu || cfg.showMem || cfg.showHerdr || cfg.showDisk || cfg.showGpu || cfg.showNet), (el) => el.child(this.sysPill(sys, t)))
+      .when(cfg.showSystem && Boolean(sys) && (SEGMENTS.some((seg) => cfg[seg.key]) || cfg.showHerdr || cfg.showDisk || cfg.showNet), (el) => el.child(this.sysPill(sys, t)))
       .child(div().flex_1())
       .when(cfg.showMedia && Boolean(media), (el) => el.child(this.mediaPill(media, t)))
       .child(div().id("palette").text_color(t.dim).cursor_pointer().on_click(() => run("app.palette")).child(this.hint()));

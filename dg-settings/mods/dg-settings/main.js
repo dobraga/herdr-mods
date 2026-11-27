@@ -25,6 +25,7 @@ import {
   checking,
   exec,
 } from "herdr";
+import { normalizeSegments, segmentDefaults, applySaved, stepValue, formatValue } from "./segment-rows.js";
 import { ProfilesDialogController } from "./profiles-dialog.js";
 import { STATIC_MODELS, listsModels, shape, baseOf, pickModel as pickModelFor, pickEffort as pickEffortFor, effortOf, levelsOf } from "./agent-models.js";
 
@@ -57,8 +58,10 @@ const APPEARANCES = [
 const DEFAULT_FONT = "JetBrains Mono";
 const DEFAULT_UI_FONT = "Geist";
 
-const USAGE_DEFAULTS = { style: "ring", warn: 60, critical: 90, showReset: false, showPace: true, colorMode: "threshold", showPercent: true, ctxWarn: 60, ctxCritical: 90, showComputer: true, showBranch: true, showAgents: true, showPrs: true, showSystem: true, showCpu: true, showMem: true, showHerdr: true, showDisk: true, showGpu: true, showNet: true, showUsage: true, showMedia: true, showProcs: true, showSpark: true, sysInterval: 3, diskInterval: 10, diskTop: 3 };
-const BAR_ITEMS = ["showComputer", "showBranch", "showAgents", "showPrs", "showSystem", "showCpu", "showMem", "showHerdr", "showDisk", "showGpu", "showNet", "showUsage", "showMedia", "showProcs", "showSpark"];
+// Non-pluggable status bar keys. The pluggable ones (segment toggles and their settings) come from the
+// `status.segments` metadata that dg-status-bar publishes; see segment-rows.js.
+const USAGE_DEFAULTS = { showComputer: true, showBranch: true, showAgents: true, showPrs: true, showSystem: true, showHerdr: true, showDisk: true, showNet: true, showMedia: true, showProcs: true, showSpark: true, sysInterval: 3, diskInterval: 10, diskTop: 3 };
+const BAR_ITEMS = ["showComputer", "showBranch", "showAgents", "showPrs", "showSystem", "showHerdr", "showDisk", "showNet", "showMedia", "showProcs", "showSpark"];
 
 export default class SettingsCustom extends View {
   init(_props, cx) {
@@ -163,41 +166,45 @@ export default class SettingsCustom extends View {
     return `${appHome()}/data/workspace-status-usage/settings.json`;
   }
 
+  segments() {
+    return normalizeSegments(shared("status.segments"));
+  }
+
+  usageDefaults() {
+    return { ...USAGE_DEFAULTS, ...segmentDefaults(this.segments()) };
+  }
+
   async loadUsageSettings() {
-    const next = { ...USAGE_DEFAULTS };
+    const segs = this.segments();
+    let next = this.usageDefaults();
+    let extra = {};
     try {
       const p = JSON.parse((await readTextFile(this.usageSettingsFile())) || "{}");
-      if (["ring", "bar", "text"].includes(p?.style)) next.style = p.style;
-      if (Number.isFinite(Number(p?.warn))) next.warn = Number(p.warn);
-      if (Number.isFinite(Number(p?.critical))) next.critical = Number(p.critical);
-      if (p?.showReset === true) next.showReset = true;
-      if (p?.showPace === false) next.showPace = false;
-      if (p?.colorMode === "pace") next.colorMode = "pace";
-      if (p?.showPercent === false) next.showPercent = false;
+      ({ next, extra } = applySaved(p, segs, next));
       for (const k of BAR_ITEMS) if (p?.[k] === false) next[k] = false;
       if ([2, 3, 5, 10].includes(Number(p?.sysInterval))) next.sysInterval = Number(p.sysInterval);
       if ([5, 10, 30, 60].includes(Number(p?.diskInterval))) next.diskInterval = Number(p.diskInterval);
       if ([3, 5, 10].includes(Number(p?.diskTop))) next.diskTop = Number(p.diskTop);
-      if (Number.isFinite(Number(p?.ctxWarn))) next.ctxWarn = Number(p.ctxWarn);
-      if (Number.isFinite(Number(p?.ctxCritical))) next.ctxCritical = Number(p.ctxCritical);
     } catch {}
     this.usageSettings = next;
+    this.usageExtra = extra;
   }
 
   updateUsageSettings(patch, cx) {
-    const cur = this.usageSettings ?? { ...USAGE_DEFAULTS };
+    const cur = this.usageSettings ?? this.usageDefaults();
     const next = { ...cur, ...patch };
-    next.warn = Math.max(0, Math.min(next.warn, next.critical - 5));
-    next.ctxWarn = Math.max(0, Math.min(next.ctxWarn, next.ctxCritical - 5));
+    if (Number.isFinite(next.warn) && Number.isFinite(next.critical)) next.warn = Math.max(0, Math.min(next.warn, next.critical - 5));
+    if (Number.isFinite(next.ctxWarn) && Number.isFinite(next.ctxCritical)) next.ctxWarn = Math.max(0, Math.min(next.ctxWarn, next.ctxCritical - 5));
     this.usageSettings = next;
-    setShared("usage.settings", next);
+    const out = { ...(this.usageExtra ?? {}), ...next };
+    setShared("usage.settings", out);
     this.usageError = null;
     cx.notify();
     cx.spawn(async (cx) => {
       try {
         await exec("mkdir", ["-p", `${appHome()}/data/workspace-status-usage`]);
         const file = this.usageSettingsFile();
-        await writeTextFile(file, JSON.stringify(next, null, 2) + "\n", await readTextFile(file));
+        await writeTextFile(file, JSON.stringify(out, null, 2) + "\n", await readTextFile(file));
       } catch (e) {
         this.usageError = String(e?.message ?? e);
         notify({ title: "Failed to save Usage settings", body: this.usageError, level: "error" });
@@ -208,19 +215,39 @@ export default class SettingsCustom extends View {
   }
 
   usageTab(t) {
-    const st = this.usageSettings ?? { ...USAGE_DEFAULTS };
+    const st = this.usageSettings ?? this.usageDefaults();
+    const segs = this.segments();
     const pill = (id, on, label, onClick) => div()
       .id(id).px(10).py(5).rounded(7).cursor_pointer().text_size(12.5).border_1()
       .border_color(on ? t.accent : t.border).bg(on ? t.selected : t.raised).text_color(on ? t.foreground : t.muted)
       .hover((x) => x.bg(t.hover)).on_click((_e, cx) => onClick(cx)).child(label);
-    const styles = h_flex().gap(6).children([["ring", "Ring"], ["bar", "Bar"], ["text", "Text only"]].map(([v, l]) =>
-      pill(`st-usage-style-${v}`, st.style === v, l, (cx) => this.updateUsageSettings({ style: v }, cx))));
     const set = (patch) => (_e, cx) => this.updateUsageSettings(patch, cx);
     const tg = (id, key, title, about) => this.row(t, title, about, this.toggle(t, id, st[key], set({ [key]: !st[key] })));
     const group = (on, ...rows) => v_flex().w_full().opacity(on ? 1 : 0.45).children(rows);
     // Two toggles per line: short metric switches read better as a grid than a long list.
     const grid2 = (...cells) => v_flex().w_full().children(Array.from({ length: Math.ceil(cells.length / 2) }, (_, i) =>
       h_flex().w_full().gap(24).children(cells.slice(i * 2, i * 2 + 2).map((c) => div().flex_1().min_w(0).child(c)))));
+    const notRunning = () => div().py(8).text_size(12.5).text_color(t.dim).child("Status bar mod not running");
+    const segToggle = (id, seg) => tg(id, seg.key, seg.title, seg.about);
+    // One row per descriptor published by the segment: toggle, choice (pills) or stepper.
+    const settingRow = (seg, d) => {
+      const id = `st-${seg.id}-${d.key}`;
+      if (d.kind === "toggle") return tg(id, d.key, d.title, d.about);
+      if (d.kind === "choice") {
+        return this.row(t, d.title, d.about, h_flex().gap(6).children((d.options ?? []).map((o) => pill(`${id}-${o.value}`, st[d.key] === o.value, o.label, (cx) => this.updateUsageSettings({ [d.key]: o.value }, cx)))));
+      }
+      const cur = Number.isFinite(Number(st[d.key])) ? Number(st[d.key]) : d.default;
+      return this.row(t, d.title, d.about, this.stepper(t, id, formatValue(d, cur), set({ [d.key]: stepValue(d, st, -1) }), set({ [d.key]: stepValue(d, st, 1) })));
+    };
+    const itemSegs = (segs ?? []).filter((s) => s.group === "item");
+    const systemSegs = (segs ?? []).filter((s) => s.group === "system");
+    // Inline (not pluggable) system items keep fixed slots between the generated segments; orders match dg-status-bar.
+    const sysCells = [
+      { order: 30, cell: tg("st-sys-herdr", "showHerdr", "Herdr", "Memory used by Herdr and what it runs, in GB.") },
+      { order: 40, cell: tg("st-sys-disk", "showDisk", "Disk", "Root disk used %.") },
+      { order: 70, cell: tg("st-sys-net", "showNet", "Network", "Download / upload per second.") },
+      ...systemSegs.map((seg) => ({ order: seg.order, cell: segToggle(`st-sys-${seg.id}`, seg) })),
+    ].sort((a, b) => a.order - b.order).map((c) => c.cell);
     const sub = (text) => div().pt(18).pb(2).text_size(12.5).font_semibold().text_color(t.muted).child(text);
     const intervals = h_flex().gap(6).children([2, 3, 5, 10].map((n) => pill(`st-sys-int-${n}`, st.sysInterval === n, `${n}s`, (cx) => this.updateUsageSettings({ sysInterval: n }, cx))));
     const diskIntervals = h_flex().gap(6).children([5, 10, 30, 60].map((n) => pill(`st-disk-int-${n}`, st.diskInterval === n, `${n}m`, (cx) => this.updateUsageSettings({ diskInterval: n }, cx))));
@@ -232,32 +259,17 @@ export default class SettingsCustom extends View {
       .child(tg("st-bar-computer", "showComputer", "Computer name", "The “This computer” / machine label."))
       .child(tg("st-bar-branch", "showBranch", "Branch & PR", "Current git branch and its PR/CI chip."))
       .child(tg("st-bar-agents", "showAgents", "Agents", "The “N agents” counter."))
-      .child(tg("st-bar-usage", "showUsage", "Usage gauges", "Claude / Antigravity subscription gauges and their popup."))
+      .children(itemSegs.map((seg) => segToggle(`st-bar-${seg.id}`, seg)))
       .child(tg("st-bar-prs", "showPrs", "Pull requests", "The PRs button that toggles the Pull Requests panel."))
       .child(tg("st-bar-system", "showSystem", "System monitor", "CPU, memory, disk and network throughput (macOS and Linux)."))
       .child(tg("st-bar-media", "showMedia", "Media player", "The now-playing pill, when a player is active."))
       .child(sub("Usage gauges"))
-      .child(group(st.showUsage,
-        this.row(t, "Gauge style", "How Ctx, 5h and 7d usage is drawn in the status bar pill, next to the percentage.", styles),
-        tg("st-usage-pct", "showPercent", "Show percentage", "Off keeps only the gauge and its label (Ctx, 5h, 7d). Ignored for Text only."),
-        tg("st-usage-pace", "showPace", "Show pace marker", "A tick on the bar marking how much of the 5h/7d window has elapsed. Fill past the tick means you are burning faster than the window."),
-        tg("st-usage-reset", "showReset", "Show reset time", "Append the time until the 5h and 7d limits reset, e.g. ↻2h 10m."),
-        this.row(t, "Color mode", "Threshold: fixed warning/critical percentages. Pace: green at or below the tick, amber above it, red 15+ points above it or at 90%+.", h_flex().gap(6).children([["threshold", "Threshold"], ["pace", "Pace"]].map(([v, l]) => pill(`st-usage-cmode-${v}`, st.colorMode === v, l, (cx) => this.updateUsageSettings({ colorMode: v }, cx))))),
-        this.row(t, "Warning color from", "Usage percentage where the gauge turns to the warning color. Used in Threshold mode, and in Pace mode when the window position is unknown.", this.stepper(t, "st-usage-warn", `${st.warn}%`, set({ warn: Math.max(0, st.warn - 5) }), set({ warn: st.warn + 5 }))),
-        this.row(t, "Critical color from", "Usage percentage where the gauge turns red.", this.stepper(t, "st-usage-crit", `${st.critical}%`, set({ critical: Math.max(st.warn + 5, st.critical - 5) }), set({ critical: Math.min(100, st.critical + 5) }))),
-        this.row(t, "Ctx warning color from", "Context usage percentage where the Ctx gauge turns to the warning color.", this.stepper(t, "st-usage-ctx-warn", `${st.ctxWarn}%`, set({ ctxWarn: Math.max(0, st.ctxWarn - 5) }), set({ ctxWarn: st.ctxWarn + 5 }))),
-        this.row(t, "Ctx critical color from", "Context usage percentage where the Ctx gauge turns red.", this.stepper(t, "st-usage-ctx-crit", `${st.ctxCritical}%`, set({ ctxCritical: Math.max(st.ctxWarn + 5, st.ctxCritical - 5) }), set({ ctxCritical: Math.min(100, st.ctxCritical + 5) }))),
-      ))
+      .children(itemSegs.filter((seg) => seg.settings.length).map((seg) => group(st[seg.key] !== false, ...seg.settings.map((d) => settingRow(seg, d)))))
+      .when(!segs, (el) => el.child(notRunning()))
       .child(sub("System monitor"))
       .child(group(st.showSystem,
-        grid2(
-          tg("st-sys-cpu", "showCpu", "CPU", "CPU usage %."),
-          tg("st-sys-mem", "showMem", "Memory", "Memory in use %."),
-          tg("st-sys-herdr", "showHerdr", "Herdr", "Memory used by Herdr and what it runs, in GB."),
-          tg("st-sys-disk", "showDisk", "Disk", "Root disk used %."),
-          tg("st-sys-gpu", "showGpu", "GPU", "NVIDIA usage % and VRAM (needs nvidia-smi)."),
-          tg("st-sys-net", "showNet", "Network", "Download / upload per second."),
-        ),
+        grid2(...sysCells),
+        ...(segs ? [] : [notRunning()]),
         this.row(t, "Refresh every", "How often the bar samples the system while the popup is closed (the popup samples faster while open).", intervals),
         tg("st-sys-procs", "showProcs", "Top processes in popup", "List the top 5 processes by CPU and memory. Runs ps only while the popup is open."),
         tg("st-sys-spark", "showSpark", "Sparklines in popup", "Short history graphs for CPU and network."),
