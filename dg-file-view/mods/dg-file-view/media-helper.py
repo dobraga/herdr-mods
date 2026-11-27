@@ -825,10 +825,98 @@ def cmd_pdf_text(file_path, page_num=None):
     return {"pages": capped, "truncated": truncated}
 
 
+def find_tool(name):
+    found = shutil.which(name)
+    if found:
+        return found
+    for d in ("/opt/homebrew/bin", "/usr/local/bin", os.path.expanduser("~/.cargo/bin"), os.path.expanduser("~/.npm-global/bin"), os.path.expanduser("~/.local/bin")):
+        cand = os.path.join(d, name)
+        if os.access(cand, os.X_OK):
+            return cand
+    return None
+
+
+def png_dimensions(path):
+    with open(path, "rb") as f:
+        head = f.read(24)
+    if head[:8] != b"\x89PNG\r\n\x1a\n":
+        raise RuntimeError("mmdc did not produce a PNG")
+    return int.from_bytes(head[16:20], "big"), int.from_bytes(head[20:24], "big")
+
+
+def cmd_mermaid(cache_dir, code, theme_json=None):
+    # mmdr (Rust, no browser, preferred) renders 1x; mmdc (mermaid-cli) is the fallback, rendered at 2x.
+    mmdr = find_tool("mmdr")
+    mmdc = None if mmdr else find_tool("mmdc")
+    if not mmdr and not mmdc:
+        raise RuntimeError("no mermaid renderer: brew tap 1jehuang/mmdr && brew install mmdr")
+    scale = 1 if mmdr else 2
+    os.makedirs(cache_dir, exist_ok=True)
+    tool = "mmdr" if mmdr else "mmdc"
+    colors = {}
+    if theme_json:
+        try:
+            colors = json.loads(theme_json)
+        except ValueError:
+            colors = {}
+    key = hashlib.sha1((f"mermaid-v4|{tool}|{sorted(colors.items())}|" + code).encode("utf-8")).hexdigest()[:14]
+    out_name = f"{key}-mermaid.png"
+    out_path = os.path.join(cache_dir, out_name)
+    if os.path.exists(out_path) and os.path.getsize(out_path) > 0:
+        touch_file(out_path)
+    else:
+        with tempfile.TemporaryDirectory() as tmp:
+            src = os.path.join(tmp, "d.mmd")
+            with open(src, "w", encoding="utf-8") as f:
+                f.write(code)
+            bg = colors.get("background", "white")
+            if mmdr:
+                cmd = [mmdr, "-i", src, "-o", out_path, "-e", "png"]
+                if colors:
+                    cfg = os.path.join(tmp, "c.json")
+                    with open(cfg, "w", encoding="utf-8") as f:
+                        json.dump({"themeVariables": {
+                            "background": bg,
+                            "primaryColor": colors.get("raised", bg),
+                            "primaryTextColor": colors.get("foreground", "#222"),
+                            "primaryBorderColor": colors.get("border", "#888"),
+                            "lineColor": colors.get("muted", "#888"),
+                            "secondaryColor": colors.get("chrome", bg),
+                            "tertiaryColor": colors.get("chrome", bg),
+                            "edgeLabelBackground": bg,
+                            "clusterBkg": colors.get("chrome", bg),
+                            "clusterBorder": colors.get("border", "#888"),
+                            # sequence diagrams ignore primaryColor and need their own variables
+                            "actorBkg": colors.get("raised", bg),
+                            "actorBorder": colors.get("border", "#888"),
+                            "actorTextColor": colors.get("foreground", "#222"),
+                            "actorLineColor": colors.get("muted", "#888"),
+                            "signalColor": colors.get("foreground", "#222"),
+                            "signalTextColor": colors.get("foreground", "#222"),
+                            "noteBkgColor": colors.get("raised", bg),
+                            "noteTextColor": colors.get("foreground", "#222"),
+                            "noteBorderColor": colors.get("border", "#888"),
+                            "labelBoxBkgColor": colors.get("raised", bg),
+                            "labelTextColor": colors.get("foreground", "#222"),
+                            "sequenceNumberColor": bg,
+                        }}, f)
+                    cmd += ["-c", cfg]
+            else:
+                cmd = [mmdc, "-i", src, "-o", out_path, "-b", bg, "-s", "2"]
+            res = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=60)
+        if res.returncode != 0 or not os.path.exists(out_path) or os.path.getsize(out_path) == 0:
+            if os.path.exists(out_path):
+                os.remove(out_path)
+            raise RuntimeError((res.stderr or res.stdout).strip()[:300] or f"{tool} failed")
+    w, h = png_dimensions(out_path)
+    prune_cache(cache_dir)
+    return {"relPath": rel_cache_path(out_name), "width": w, "height": h, "scale": scale}
+
+
 def main(argv=None):
     args = sys.argv[1:] if argv is None else argv
     if not args:
-        emit({"error": "Usage: media-helper.py <image-info|audio-info|video-info|video-frame|audio-start|pdf-info|pdf-page|pdf-text> ..."}, 1)
+        emit({"error": "Usage: media-helper.py <image-info|audio-info|video-info|video-frame|audio-start|pdf-info|pdf-page|pdf-text|mermaid> ..."}, 1)
 
     cmd = args[0]
     try:
@@ -846,6 +934,8 @@ def main(argv=None):
             emit(cmd_pdf_info(args[1], args[2]))
         elif cmd == "pdf-page" and len(args) in (4, 5):
             emit(cmd_pdf_page(args[1], args[2], args[3], args[4] if len(args) == 5 else 150))
+        elif cmd == "mermaid" and len(args) in (3, 4):
+            emit(cmd_mermaid(args[1], args[2], args[3] if len(args) == 4 else None))
         elif cmd == "pdf-text" and len(args) in (2, 3):
             emit(cmd_pdf_text(args[1], args[2] if len(args) == 3 else None))
         else:

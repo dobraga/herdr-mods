@@ -1,5 +1,5 @@
 // Fast file editor, media previewer (image/SVG/audio/video), git diff viewer, and inline Open With screen.
-import { View, div, svg, list } from "gpui-kit";
+import { View, div, svg, list, image } from "gpui-kit";
 import { v_flex, h_flex, Editor, EditorState, TextView, Scrollbar, v_virtual_list, Input, InputState, SliderState, ScrollHandle, VirtualListScrollHandle } from "gpui-base";
 import { props, shared, setShared, spaces, panes, focused, run, exec, readTextFile, writeTextFile, watchFolder, theme, settings, home, checking, notify } from "herdr";
 import { colorRows } from "./syntax.js";
@@ -7,6 +7,7 @@ import { inspectFile, launchApp, setDefaultApp, revealInFolder, visibleApps, ren
 import {
   AUDIO_RATES,
   loadImagePreview,
+  loadMermaid,
   loadAudioPreview,
   loadVideoPreview,
   extractVideoFrame,
@@ -16,6 +17,7 @@ import {
   loadPdfPage,
   loadPdfText,
   renderImageView,
+  pillBtn,
   renderAudioView,
   renderVideoView,
   renderPdfView,
@@ -81,6 +83,11 @@ function splitMdBlocks(text) {
   flush();
   return blocks;
 }
+
+const mermaidCode = (b) => {
+  const m = /^\s*(```|~~~)mermaid[^\n]*\n([\s\S]*?)\n\s*\1\s*$/.exec(b);
+  return m ? m[2] : null;
+};
 
 const isFencedBlock = (b) => /^\s*(```|~~~)/.test(b);
 
@@ -504,6 +511,8 @@ export default class FileView extends View {
     this.mediaError = null;
     this.isSvgFile = false;
     this.svgPreview = null;
+    this.mermaidZoom = null;
+    this.savedMediaData = null;
     this.imgFit = true;
     this.imgZoom = 1;
     this.audioStatus = null;
@@ -1747,7 +1756,130 @@ export default class FileView extends View {
   }
 
   // Blocks are rendered lazily (only the visible ones) so a huge markdown file doesn't lay out whole.
-  renderMdPreview() {
+  // The finished render of a ```mermaid block, or null (not a diagram, still rendering, or failed).
+  mermaidReady(block) {
+    const code = mermaidCode(block);
+    if (code === null || !this.mermaidCache) return null;
+    const t = theme();
+    const colors = {};
+    for (const k of ["background", "foreground", "border", "muted", "chrome", "raised"]) if (typeof t[k] === "string") colors[k] = t[k];
+    const entry = this.mermaidCache.get(`${JSON.stringify(colors)}|${code}`);
+    return entry?.state === "ok" ? entry : null;
+  }
+
+  readyDiagrams() {
+    return (this.mdBlocks || []).map((b) => this.mermaidReady(b)).filter(Boolean);
+  }
+
+  // Opened by clicking a diagram (the list's on_item_click); Prev/Next and arrows switch.
+  showMermaid(idx, cx) {
+    const list = this.readyDiagrams();
+    if (!list.length) return;
+    const n = ((idx % list.length) + list.length) % list.length;
+    if (!this.mermaidZoom) this.savedMediaData = this.mediaData;
+    this.mermaidIdx = n;
+    this.focusHandle?.focus();
+    this.mermaidZoom = { relPath: list[n].relPath, width: list[n].width, height: list[n].height };
+    this.mediaData = this.mermaidZoom;
+    this.imgFit = true;
+    this.imgZoom = 1;
+    cx.notify();
+  }
+
+  // A ```mermaid block draws as a rendered PNG (mmdc, cached by hash); until it is ready, or if it
+  // fails, the block stays as code with the error underneath.
+  renderMdBlock(block, i, cx) {
+    const code = mermaidCode(block);
+    if (code === null) return TextView.markdown(`fv-md-${this.slotId}-p${i}`, block);
+    if (!this.mermaidCache) this.mermaidCache = new Map();
+    // Drawn in the theme's colors so the PNG blends with the preview instead of a white card.
+    const t = theme();
+    const colors = {};
+    for (const k of ["background", "foreground", "border", "muted", "chrome", "raised"]) if (typeof t[k] === "string") colors[k] = t[k];
+    const cacheKey = `${JSON.stringify(colors)}|${code}`;
+    let entry = this.mermaidCache.get(cacheKey);
+    if (!entry) {
+      entry = { state: "loading" };
+      this.mermaidCache.set(cacheKey, entry);
+      cx.spawn(async (cx) => {
+        try {
+          Object.assign(entry, { state: "ok", ...(await loadMermaid(code, colors)) });
+        } catch (e) {
+          Object.assign(entry, { state: "error", error: String(e?.message || e) });
+        }
+        cx.notify();
+      });
+    }
+    if (entry.state === "ok") {
+      // Fit every diagram in the same box (900x480, scaled down only) so a tall one and a wide one
+      // read at a similar size; the PNG may be rendered at 2x (mmdc). Zoom shows it at full size.
+      const lw = entry.width / (entry.scale || 1);
+      const lh = entry.height / (entry.scale || 1);
+      const k = Math.min(1, 900 / lw, 480 / lh);
+      return image(entry.relPath).w(Math.round(lw * k)).h(Math.round(lh * k));
+    }
+    const code_el = TextView.markdown(`fv-md-${this.slotId}-p${i}`, block);
+    return entry.state === "loading"
+      ? code_el
+      : v_flex().child(code_el).child(div().text_size(12).child(`mermaid: ${entry.error}`));
+  }
+
+  // Clicking a diagram swaps the document for the image viewer (Fit, 100%, +/-, scroll to pan).
+  closeMermaidZoom(cx) {
+    this.mermaidZoom = null;
+    this.mediaData = this.savedMediaData ?? null;
+    this.savedMediaData = null;
+    cx.notify();
+  }
+
+  // The document stays rendered; a diagram opens as a modal over it (backdrop + framed viewer).
+  renderMdPreview(cx, slot, fullPath) {
+    const base = this.renderMdList(cx);
+    if (!this.mermaidZoom) return base;
+    const t = theme();
+    const n = this.readyDiagrams().length;
+    const bar = h_flex()
+      .h(36)
+      .flex_none()
+      .px(12)
+      .items_center()
+      .gap(8)
+      .bg(t.chrome)
+      .border_b(1)
+      .border_color(t.border)
+      .child(div().flex_1().min_w(0).text_size(12).text_color(t.foreground).child(`Diagram ${(this.mermaidIdx ?? 0) + 1} / ${n}`))
+      .when(n > 1, (el) =>
+        el
+          .child(pillBtn("fv-mmd-prev", "‹ Prev", false, t, (_e, cx) => this.showMermaid((this.mermaidIdx ?? 0) - 1, cx)))
+          .child(pillBtn("fv-mmd-next", "Next ›", false, t, (_e, cx) => this.showMermaid((this.mermaidIdx ?? 0) + 1, cx))),
+      )
+      .child(pillBtn("fv-mmd-close", "✕ Close", false, t, (_e, cx) => this.closeMermaidZoom(cx)));
+    return v_flex()
+      .relative()
+      .flex_1()
+      .min_h(0)
+      .child(base)
+      .child(
+        div()
+          .absolute()
+          .inset_0()
+          .p(28)
+          .bg("#000000b3")
+          .child(
+            v_flex()
+              .size_full()
+              .rounded(10)
+              .overflow_hidden()
+              .bg(t.background)
+              .border(1)
+              .border_color(t.border)
+              .child(bar)
+              .child(renderImageView(this, slot, fullPath, t)),
+          ),
+      );
+  }
+
+  renderMdList(cx) {
     if (this.mdBlocksSrc !== this.markdownText) {
       this.mdBlocks = splitMdBlocks(this.markdownText);
       this.mdBlocksSrc = this.markdownText;
@@ -1763,8 +1895,14 @@ export default class FileView extends View {
           id,
           blocks.length,
           (i) => `${i}`,
-          (i) => div().px(20).py(6).child(TextView.markdown(`fv-md-${this.slotId}-p${i}`, blocks[i])),
-        ).size_full(),
+          (i) => div().px(20).py(6).child(this.renderMdBlock(blocks[i], i, cx)),
+        )
+          // One handler for the whole list: gpui-kit throws on a handler registered inside the item renderer.
+          .on_item_click((key, cx) => {
+            const ready = this.mermaidReady(blocks[Number(key)]);
+            if (ready) this.showMermaid(this.readyDiagrams().indexOf(ready), cx);
+          })
+          .size_full(),
       )
       .child(Scrollbar.vertical(id).absolute().inset_0());
   }
@@ -1984,6 +2122,14 @@ export default class FileView extends View {
       .text_size(13)
       .on_key_down((e, cx) => {
         const k = e.key?.toLowerCase();
+        if (this.mermaidZoom) {
+          if (k === "escape") this.closeMermaidZoom(cx);
+          else if (k === "left") this.showMermaid((this.mermaidIdx ?? 0) - 1, cx);
+          else if (k === "right") this.showMermaid((this.mermaidIdx ?? 0) + 1, cx);
+          else return;
+          cx.stop_propagation();
+          return;
+        }
         if (
           k === "s" &&
           (e.modifiers?.control || e.modifiers?.platform) &&
@@ -2419,7 +2565,7 @@ export default class FileView extends View {
               : this.mdPreview && this.markdownText
                 ? this.fileSearchOpen && this.fileSearchQuery.trim()
                   ? this.renderMdSearchView(t)
-                  : this.renderMdPreview()
+                  : this.renderMdPreview(cx, slot, fullPath)
                 : this.code && this.fileSearchOpen && this.fileSearchQuery.trim()
                   ? this.renderCodeSearchView(t)
                   : this.code

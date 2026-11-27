@@ -36,6 +36,12 @@ export function extractVideoFrame(fullPath, sec) {
   return runPythonHelper("media-helper.py", ["video-frame", mediaCacheDir(), fullPath, String(sec)], { timeout: 15000 });
 }
 
+export function loadMermaid(code, colors) {
+  const args = ["mermaid", mediaCacheDir(), code];
+  if (colors) args.push(JSON.stringify(colors));
+  return runPythonHelper("media-helper.py", args, { timeout: 70000 });
+}
+
 export function startAudioDaemon(fullPath) {
   return runPythonHelper("media-helper.py", ["audio-start", fullPath], { timeout: 10000 });
 }
@@ -109,7 +115,7 @@ export function renderSlider(state, t, { height = 22, trackH = 5, thumbSize = 14
   );
 }
 
-function pillBtn(id, label, active, t, onClick, { primary = false } = {}) {
+export function pillBtn(id, label, active, t, onClick, { primary = false } = {}) {
   return h_flex()
     .id(id)
     .h(26)
