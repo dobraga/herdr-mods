@@ -2,7 +2,7 @@
 import { View, div, svg, list, image } from "gpui-kit";
 import { v_flex, h_flex, Editor, EditorState, TextView, Scrollbar, v_virtual_list, Input, InputState, SliderState, ScrollHandle, VirtualListScrollHandle } from "gpui-base";
 import { props, shared, setShared, spaces, panes, focused, run, exec, readTextFile, writeTextFile, watchFolder, theme, settings, home, checking, notify } from "herdr";
-import { colorRows } from "./syntax.js";
+import { colorRows, languageByTag, tokenize } from "./syntax.js";
 import { inspectFile, launchApp, setDefaultApp, revealInFolder, visibleApps, renderOpenWithScreen } from "./open-with-ui.js";
 import {
   AUDIO_RATES,
@@ -65,8 +65,48 @@ function diffRows(lines) {
   });
 }
 
+// The preview's renderer has no <details>, footnotes or definition lists: turn them into plain Markdown it
+// does draw (fenced code is left alone). <details> becomes its bold summary and the body; [^n] a
+// superscript number with the notes listed at the end; "Term" + ": text" a bold term and a "↳" line.
+function mdPrep(text) {
+  if (!/<details|<summary|\[\^[^\]]+\]|^:\s/m.test(text)) return text;
+  const SUP = "⁰¹²³⁴⁵⁶⁷⁸⁹";
+  const sup = (n) => String(n).replace(/\d/g, (d) => SUP[Number(d)]);
+  const defs = new Map(), order = [], out = [];
+  let fence = null;
+  const lines = text.split("\n").filter((line) => {
+    const f = /^\s*(```|~~~)/.exec(line);
+    if (f) fence = fence ? (fence === f[1] ? null : fence) : f[1];
+    const d = !fence && !f && /^\[\^([^\]]+)\]:\s*(.*)$/.exec(line);
+    if (d) defs.set(d[1], d[2]);
+    return !d;
+  });
+  fence = null;
+  for (let line of lines) {
+    const f = /^\s*(```|~~~)/.exec(line);
+    if (f) fence = fence ? (fence === f[1] ? null : fence) : f[1];
+    if (fence || f) { out.push(line); continue; }
+    line = line
+      .replace(/<\/?details[^>]*>/gi, "")
+      .replace(/<summary[^>]*>([\s\S]*?)<\/summary>/gi, "**▾ $1**")
+      .replace(/\[\^([^\]]+)\]/g, (m, id) => {
+        if (!defs.has(id)) return m;
+        if (!order.includes(id)) order.push(id);
+        return sup(order.indexOf(id) + 1);
+      });
+    const def = /^:\s+(.*)$/.exec(line), prev = out[out.length - 1];
+    if (def && prev?.trim()) {
+      out[out.length - 1] = prev.startsWith("↳") ? `${prev}  ` : `**${prev.trim()}**  `;
+      out.push(`↳ ${def[1]}`);
+    } else if (line.trim() || out[out.length - 1]?.trim() !== "" ) out.push(line);
+  }
+  if (order.length) out.push("", "---", "", ...order.map((id, n) => `${sup(n + 1)} ${defs.get(id)}${n < order.length - 1 ? "  " : ""}`));
+  return out.join("\n");
+}
+
 // Splits markdown into blank-line separated blocks, keeping fenced code intact.
 function splitMdBlocks(text) {
+  text = mdPrep(text);
   const blocks = [];
   let cur = [];
   let fence = null;
@@ -1762,7 +1802,7 @@ export default class FileView extends View {
     if (code === null || !this.mermaidCache) return null;
     const t = theme();
     const colors = {};
-    for (const k of ["background", "foreground", "border", "muted", "chrome", "raised"]) if (typeof t[k] === "string") colors[k] = t[k];
+    for (const k of ["background", "foreground", "border", "muted", "chrome", "raised", "ansi1", "ansi2", "ansi3", "ansi4", "ansi5", "ansi6"]) if (typeof t[k] === "string") colors[k] = t[k];
     const entry = this.mermaidCache.get(`${JSON.stringify(colors)}|${code}`);
     return entry?.state === "ok" ? entry : null;
   }
@@ -1786,16 +1826,58 @@ export default class FileView extends View {
     cx.notify();
   }
 
+  // A fenced code block drawn by hand in syntax colors (the Markdown view cannot color text); null when
+  // it is not one, is unterminated or huge, so the caller falls back to the plain view.
+  codeCard(block, t) {
+    const m = /^\s*(```|~~~)([^\n]*)\n([\s\S]*?)\n?[ \t]*\1[ \t]*$/.exec(block);
+    if (!m) return null;
+    const rows = m[3].split("\n");
+    if (rows.length > 400) return null;
+    const tag = m[2].trim().split(/[\s{]/)[0].toLowerCase();
+    const lang = languageByTag(tag);
+    const tone = { keyword: t.ansi5, string: t.ansi2, comment: t.dim, function: t.ansi4, type: t.ansi3, number: t.ansi6, constant: t.ansi6 };
+    let open = null;
+    const lines = rows.map((raw) => {
+      const text = raw.replace(/\t/g, "  ");
+      if (tag === "diff") {
+        const c = text.startsWith("+") ? t.ansi2 : text.startsWith("-") ? t.ansi1 : text.startsWith("@@") ? t.ansi6 : t.foreground;
+        return h_flex().flex_none().whitespace_nowrap().text_color(c).child(text || " ");
+      }
+      if (!lang || text.length > 400) return h_flex().flex_none().whitespace_nowrap().text_color(t.foreground).child(text || " ");
+      try {
+        const r = tokenize(text, lang, open);
+        open = r.open;
+        return h_flex().flex_none().whitespace_nowrap().children(r.tokens.map((k) => div().flex_none().text_color(tone[k.kind] ?? t.foreground).child(k.text)));
+      } catch {
+        return h_flex().flex_none().whitespace_nowrap().text_color(t.foreground).child(text || " ");
+      }
+    });
+    return v_flex()
+      .w_full()
+      .rounded(6)
+      .bg(t.raised)
+      .border(1)
+      .border_color(t.border)
+      .px(12)
+      .py(8)
+      .gap(1)
+      .overflow_hidden()
+      .font_family(settings().font_family ?? "JetBrains Mono")
+      .text_size(12.5)
+      .when(Boolean(tag), (el) => el.child(div().flex_none().text_size(10.5).text_color(t.dim).pb(2).child(tag)))
+      .children(lines);
+  }
+
   // A ```mermaid block draws as a rendered PNG (mmdr, cached by hash); until it is ready, or if it
   // fails, the block stays as code with the error underneath.
   renderMdBlock(block, i, cx) {
     const code = mermaidCode(block);
-    if (code === null) return TextView.markdown(`fv-md-${this.slotId}-p${i}`, block);
+    if (code === null) return this.codeCard(block, theme()) ?? TextView.markdown(`fv-md-${this.slotId}-p${i}`, block);
     if (!this.mermaidCache) this.mermaidCache = new Map();
     // Drawn in the theme's colors so the PNG blends with the preview instead of a white card.
     const t = theme();
     const colors = {};
-    for (const k of ["background", "foreground", "border", "muted", "chrome", "raised"]) if (typeof t[k] === "string") colors[k] = t[k];
+    for (const k of ["background", "foreground", "border", "muted", "chrome", "raised", "ansi1", "ansi2", "ansi3", "ansi4", "ansi5", "ansi6"]) if (typeof t[k] === "string") colors[k] = t[k];
     const cacheKey = `${JSON.stringify(colors)}|${code}`;
     let entry = this.mermaidCache.get(cacheKey);
     if (!entry) {

@@ -857,7 +857,7 @@ def cmd_mermaid(cache_dir, code, theme_json=None):
             colors = json.loads(theme_json)
         except ValueError:
             colors = {}
-    key = hashlib.sha1((f"mermaid-v5|{sorted(colors.items())}|" + code).encode("utf-8")).hexdigest()[:14]
+    key = hashlib.sha1((f"mermaid-v6|{sorted(colors.items())}|" + code).encode("utf-8")).hexdigest()[:14]
     out_name = f"{key}-mermaid.png"
     out_path = os.path.join(cache_dir, out_name)
     if os.path.exists(out_path) and os.path.getsize(out_path) > 0:
@@ -896,6 +896,13 @@ def cmd_mermaid(cache_dir, code, theme_json=None):
                         "labelBoxBkgColor": colors.get("raised", bg),
                         "labelTextColor": colors.get("foreground", "#222"),
                         "sequenceNumberColor": bg,
+                        # pie charts: slices from the theme's accent colors, text in the foreground
+                        **{f"pie{n + 1}": colors.get(f"ansi{n % 6 + 1}", colors.get("muted", "#888")) for n in range(12)},
+                        "pieTitleTextColor": colors.get("foreground", "#222"),
+                        "pieSectionTextColor": bg,
+                        "pieLegendTextColor": colors.get("foreground", "#222"),
+                        "pieStrokeColor": bg,
+                        "pieOuterStrokeColor": colors.get("border", "#888"),
                     }}, f)
                 cmd += ["-c", cfg]
             res = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=60)

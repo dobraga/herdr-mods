@@ -52,6 +52,14 @@ export function languageOf(path) {
   return key ? LANGS[key] : null;
 }
 
+const TAGS = { javascript: "js", typescript: "js", python: "py", shell: "sh", console: "sh", rust: "rs", golang: "go", yml: "yaml", toml: "yaml", markdown: "md" };
+// A fenced block's language tag ("js", "python", "bash") to a language, or null.
+export function languageByTag(tag) {
+  const t = String(tag ?? "").trim().split(/[\s{]/)[0].toLowerCase();
+  const key = TAGS[t] ?? BY_ENDING[t] ?? (LANGS[t] ? t : null);
+  return key ? LANGS[key] : null;
+}
+
 const WORD = /[A-Za-z_$][\w$-]*/y;
 const NUMBER = /0[xX][\da-fA-F]+|\d+(?:\.\d+)?/y;
 const SPACE = /\s+/y;
