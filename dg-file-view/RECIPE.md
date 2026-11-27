@@ -42,7 +42,8 @@ Files in `mods/dg-file-view/` (no art of its own):
 
 - `mod.json`: `{"place": "none", "title": "File View"}`.
 - `main.js`: the `FileView` class (default export), mode switching, editor, search, diff loading, keys, all layout.
-- `syntax.js`: dependency-free line tokenizer for diff rows (`languageOf`, `tokenize`, `colorRows`); no coloring above 5000 rows or 400-char lines.
+- `syntax.js`: dependency-free line tokenizer shared by diff rows, the code search list and the Markdown code cards (`languageOf(path)`, `languageByTag(fence tag)`, `tokenize`, `colorRows`). Families: js/ts, C-like (C, C++, Java, Kotlin, Swift, PHP, C#, Zig...), Go, Rust, CSS, JSON, Python, shell, Ruby, Lua, YAML/TOML/INI/HCL, SQL, HTML/XML, Markdown, plus generic `#` and `--` comment families (R, Julia, Elixir, Perl, Haskell...). A file or fence of any other language is drawn plain, like the Editor does. No coloring above 5000 diff rows, 20000 search lines or 400-char lines.
+- Code files are generic: the same Ctrl/Cmd+F bar, hit coloring, gutter, scroll-keeping Esc and syntax colors apply to every text file the Editor opens; only Markdown has its own rendered preview.
 - `open-with-ui.js`: `runPythonHelper`, Open with screen, app filtering.
 - `media-ui.js`: image, audio, video and PDF views plus the bridge calls and the audio HTTP client.
 - `open-with.py`: `inspect`, `launch`, `set-default`, `reveal` commands (JSON on stdout).

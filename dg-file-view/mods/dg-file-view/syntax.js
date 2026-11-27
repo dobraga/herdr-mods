@@ -10,6 +10,8 @@ const RS = set("as async await break const continue crate dyn else enum extern f
 const CLIKE = set("abstract break case catch class const continue default do else enum extends final finally for if implements import interface new package private protected public return static switch this throw throws try void while namespace using struct virtual override");
 const CSS = set("important media import keyframes supports font-face");
 const SQL = set("select from where and or not null insert into values update set delete create table alter drop index join left right inner outer on group by order having limit offset as distinct union case when then else end primary key foreign references default");
+const RUBY = set("alias and begin break case class def do else elsif end ensure false for if in module next nil not or redo rescue retry return self super then true undef unless until when while yield require require_relative attr_accessor attr_reader attr_writer include extend");
+const LUA = set("and break do else elseif end false for function goto if in local nil not or repeat return then true until while");
 const NONE = new Set();
 
 const C_LINE = ["//"], HASH = ["#"];
@@ -26,6 +28,10 @@ const LANGS = {
   sh: mk(SH, { line: HASH }),
   yaml: mk(NONE, { line: HASH }),
   sql: mk(SQL, { line: ["--"], block: [["/*", "*/"]], fold: true }),
+  ruby: mk(RUBY, { line: HASH }),
+  lua: mk(LUA, { line: ["--"], block: [["--[[", "]]"]] }),
+  hash: mk(NONE, { line: HASH }), // R, Julia, Elixir, Perl, Nim...: strings, numbers and # comments
+  dash: mk(NONE, { line: ["--"], block: [["{-", "-}"]] }), // Haskell, Elm
   md: mk(NONE, { quotes: "`" }),
   html: mk(NONE, { block: [["<!--", "-->"]] }),
 };
@@ -33,18 +39,22 @@ const LANGS = {
 const BY_ENDING = {};
 const add = (lang, exts) => exts.split(" ").forEach((e) => (BY_ENDING[e] = lang));
 add("js", "js mjs cjs jsx ts tsx mts cts");
-add("clike", "c h cpp cc hpp java kt swift php dart scala cs");
+add("clike", "c h cpp cc hpp hh cxx hxx m mm cu java kt kts swift php dart scala cs groovy gradle zig proto v sv ino");
 add("go", "go");
 add("rs", "rs");
-add("css", "css scss less");
+add("css", "css scss sass less styl");
 add("json", "json jsonc");
-add("py", "py");
-add("sh", "sh bash zsh rb ps1");
-add("yaml", "yml yaml toml ini conf env");
+add("py", "py pyi pyw");
+add("sh", "sh bash zsh fish ps1 bat cmd");
+add("ruby", "rb rake gemspec");
+add("lua", "lua");
+add("hash", "r jl ex exs pl pm nim cr");
+add("dash", "hs elm");
+add("yaml", "yml yaml toml ini conf cfg env properties hcl tf tfvars gitconfig");
 add("sql", "sql");
 add("md", "md markdown");
-add("html", "html htm xml svg vue");
-const BY_NAME = { dockerfile: "sh", makefile: "sh", ".gitignore": "sh", ".gitattributes": "sh", ".env": "yaml", ".zshrc": "sh", ".bashrc": "sh" };
+add("html", "html htm xhtml xml svg vue svelte xsd plist");
+const BY_NAME = { dockerfile: "sh", makefile: "sh", ".gitignore": "sh", ".gitattributes": "sh", ".env": "yaml", ".zshrc": "sh", ".bashrc": "sh", gemfile: "ruby", rakefile: "ruby" };
 
 export function languageOf(path) {
   const name = String(path ?? "").split("/").pop()?.toLowerCase() ?? "";
@@ -52,7 +62,7 @@ export function languageOf(path) {
   return key ? LANGS[key] : null;
 }
 
-const TAGS = { javascript: "js", typescript: "js", python: "py", shell: "sh", console: "sh", rust: "rs", golang: "go", yml: "yaml", toml: "yaml", markdown: "md" };
+const TAGS = { javascript: "js", typescript: "js", python: "py", shell: "sh", console: "sh", powershell: "sh", docker: "sh", dockerfile: "sh", makefile: "sh", rust: "rs", golang: "go", yml: "yaml", toml: "yaml", terraform: "yaml", markdown: "md", kotlin: "clike", csharp: "clike", "c++": "clike", objc: "clike", julia: "hash", elixir: "hash", perl: "hash", haskell: "dash", ruby: "ruby" };
 // A fenced block's language tag ("js", "python", "bash") to a language, or null.
 export function languageByTag(tag) {
   const t = String(tag ?? "").trim().split(/[\s{]/)[0].toLowerCase();
