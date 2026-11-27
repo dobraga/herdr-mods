@@ -1891,6 +1891,8 @@ export default class FileView extends View {
     });
     const tokens = this.codeTokensFor(lines, this.slot()?.path);
     const tone = syntaxTone(t);
+    // The Editor's gutter is as wide as the largest line number needs; match it so the code does not shift on Ctrl+F.
+    const numW = String(lines.length).length * 7.5;
     const row = (i) => {
       const text = lines[i] ?? "";
       const ranges = (byLine.get(i) ?? []).map((h) => ({ a: h.col, b: h.col + q.length, cur: h.cur }));
@@ -1900,10 +1902,11 @@ export default class FileView extends View {
         .w_full()
         .h(20)
         .flex_none()
-        .gap(12)
-        .px(8)
+        .gap(20)
+        .pl(5)
+        .pr(8)
         .items_center()
-        .child(div().w(40).flex_none().text_right().text_color(t.dim).child(String(i + 1)))
+        .child(div().w(numW).flex_none().text_right().text_color(t.dim).child(String(i + 1)))
         .child(body);
     };
     return div()
