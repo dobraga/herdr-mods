@@ -36,7 +36,6 @@ const UNSUPPORTED_ERR_RE = /utf-?8|invalid data|binary|too large|exceeds/i;
 const READ = ["--no-optional-locks", "-c", "core.fsmonitor=false", "-c", "diff.autoRefreshIndex=false"];
 const MAX_CHARS = 400000;
 const MAX_DIFF_LINE_CHARS = 1200;
-const MAX_DIFF_WIDTH = 4000;
 const countLines = (text) => (text ? text.split("\n").length - Number(text.endsWith("\n")) : 0);
 const untab = (text) => text.replace(/[^\t]*\t/g, (s) => s.slice(0, -1).padEnd((s.length - 1) - (s.length - 1) % 4 + 4));
 
@@ -63,6 +62,26 @@ function diffRows(lines) {
     if (kind === " ") { old++; return { kind, number: next++, text: untab(line.slice(1)) || " " }; }
     return { kind: "", text: line };
   });
+}
+
+// Splits a diff row into display lines of at most `cols` characters (hard wrap, syntax tokens kept), so a long
+// line (Markdown prose especially) shows in full instead of running off the pane.
+const DIFF_LINE_H = 20;
+function wrapDiffRow(row, cols) {
+  const toks = row.tokens ?? [{ kind: "", text: row.text }];
+  const lines = [[]];
+  let used = 0;
+  for (const tok of toks) {
+    let rest = tok.text;
+    while (rest.length) {
+      if (used >= cols) { lines.push([]); used = 0; }
+      const part = rest.slice(0, cols - used);
+      lines[lines.length - 1].push({ kind: tok.kind, text: part });
+      used += part.length;
+      rest = rest.slice(part.length);
+    }
+  }
+  return lines;
 }
 
 // The preview's renderer has no <details>, footnotes or definition lists: turn them into plain Markdown it
@@ -382,7 +401,8 @@ export default class FileView extends View {
     this.saveError = null;
     this.rows = [];
     this.diffVersion = 0;
-    this.diffWidth = 300;
+    this.diffScroll = VirtualListScrollHandle.new();
+    this.diffLayout = null;
     this.error = null;
     this.loading = false;
     this.watched = null;
@@ -745,8 +765,7 @@ export default class FileView extends View {
   setLines(lines, path) {
     this.rows = colorRows(diffRows(lines), path);
     this.diffVersion = (this.diffVersion ?? 0) + 1;
-    const rawWidth = Math.max(300, ...this.rows.map((row) => (row.text.length + 1) * 7.5 + 60));
-    this.diffWidth = Math.min(MAX_DIFF_WIDTH, rawWidth);
+    this.diffLayout = null;
   }
 
   fetchOpenWithData(fullPath, seq, cx, { focusInput = false } = {}) {
@@ -2241,6 +2260,8 @@ export default class FileView extends View {
     this.fileSearchInput?.release();
     this.fileSearchInput = null;
     this.mdScroll?.release();
+    this.diffScroll?.release();
+    this.diffScroll = null;
     this.mdScroll = null;
     this.mdPlain?.release();
     this.mdPlain = null;
@@ -2256,29 +2277,47 @@ export default class FileView extends View {
     this.pdfPageSlider = null;
   }
 
-  diffRow({ kind, number, text, tokens }, t) {
+  diffRow(row, wrapped, t) {
+    const { kind, number, text } = row;
     const pct = Number(shared("files-tabs.settings")?.diffTint);
     const alpha = Math.round(((Number.isFinite(pct) ? Math.min(30, Math.max(0, pct)) : 10) / 100) * 255).toString(16).padStart(2, "0");
     const tone = { keyword: t.ansi5, string: t.ansi2, comment: t.dim, function: t.ansi4, type: t.ansi3, number: t.ansi6, constant: t.ansi6 };
-    if (kind === "@") {
-      return div().w_full().px(14).h(22).flex_none().flex().items_center().truncate().bg(t.raised).text_color(t.dim).child(text);
-    }
+    const body = v_flex().flex_1().min_w(0).children(
+      wrapped.map((segs) =>
+        h_flex().h(DIFF_LINE_H).flex_none().overflow_hidden().whitespace_nowrap().children(
+          segs.map((k) => div().flex_none().text_color(kind === "@" ? t.dim : tone[k.kind] ?? t.foreground).child(k.text)),
+        ),
+      ),
+    );
+    if (kind === "@") return h_flex().w_full().px(14).py(1).flex_none().bg(t.raised).child(body);
     return h_flex()
       .w_full()
-      .h(22)
+      .py(1)
       .flex_none()
+      .items_start()
       .gap(12)
       .px(8)
-      .items_center()
       .when(kind === "+", (e) => e.bg(t.ansi2 + alpha))
       .when(kind === "-", (e) => e.bg(t.ansi1 + alpha))
-      .child(div().w(36).flex_none().text_right().text_color(t.dim).child(number === undefined ? "" : String(number)))
-      .child(div().w(12).flex_none().text_color(kind === "+" ? t.ansi2 : kind === "-" ? t.ansi1 : t.dim).child(kind || " "))
-      .child(
-        tokens
-          ? h_flex().flex_1().min_w(0).overflow_hidden().whitespace_nowrap().children(tokens.map((k) => div().flex_none().text_color(tone[k.kind] ?? t.foreground).child(k.text)))
-          : div().flex_1().min_w(0).truncate().child(text),
-      );
+      .child(div().w(36).h(DIFF_LINE_H).flex_none().text_right().text_color(t.dim).child(number === undefined ? "" : String(number)))
+      .child(div().w(12).h(DIFF_LINE_H).flex_none().text_color(kind === "+" ? t.ansi2 : kind === "-" ? t.ansi1 : t.dim).child(kind || " "))
+      .child(body);
+  }
+
+  // Wrapped lines and row heights for the pane's current width (monospace 12.5px ≈ 7.5px per character).
+  diffLayoutFor(cx) {
+    const width = this.diffScroll?.viewport_size()?.width ?? 0;
+    const cols = width > 0 ? Math.max(20, Math.floor((width - 92) / 7.6)) : 100;
+    if (this.diffLayout?.cols !== cols || this.diffLayout.rows !== this.rows) {
+      const wrapped = this.rows.map((row) => wrapDiffRow(row, row.kind === "@" ? cols + 8 : cols));
+      this.diffLayout = { cols, rows: this.rows, wrapped, sizes: wrapped.map((w) => w.length * DIFF_LINE_H + 2) };
+      this.diffVersion = (this.diffVersion ?? 0) + 1;
+    }
+    if (width === 0 && !this.diffMeasure) {
+      this.diffMeasure = true;
+      setTimeout(() => { this.diffMeasure = false; cx.notify(); }, 50);
+    }
+    return this.diffLayout;
   }
 
   render(cx) {
@@ -2810,26 +2849,22 @@ export default class FileView extends View {
                 .font_family(settings().font_family ?? "JetBrains Mono")
                 .text_size(12.5)
                 .child(
-                  div()
-                    .id(`fv-diff-x-${this.slotId}-${this.diffVersion}`)
-                    .absolute()
-                    .inset_0()
-                    .overflow_x_scrollbar()
-                    .child(
-                      div()
-                        .w_full()
-                        .min_w(this.diffWidth)
-                        .h_full()
-                        .child(
-                          v_virtual_list(
-                            `fv-diff-${this.slotId}-${this.diffVersion}`,
-                            this.rows.length,
-                            22,
-                            (i) => `${this.diffVersion}-${i}`,
-                            (range) => this.rows.slice(range.start, range.end).map((row) => this.diffRow(row, t)),
-                          ).size_full(),
-                        ),
-                    ),
+                  (() => {
+                    const lay = this.diffLayoutFor(cx);
+                    return v_virtual_list(
+                      `fv-diff-${this.slotId}-${this.diffVersion}`,
+                      this.rows.length,
+                      lay.sizes,
+                      (i) => `${this.diffVersion}-${i}`,
+                      (range) => {
+                        const out = [];
+                        for (let i = range.start; i < range.end; i++) out.push(this.diffRow(this.rows[i], lay.wrapped[i], t));
+                        return out;
+                      },
+                    )
+                      .track_scroll(this.diffScroll)
+                      .size_full();
+                  })(),
                 )
                 .child(Scrollbar.vertical(`fv-diff-${this.slotId}-${this.diffVersion}`).viewport_from_layout().absolute().inset_0())
                 .when(this.loading && this.rows.length === 0, (e) => e.child(div().p(16).text_color(t.dim).child("Loading diff…"))),
