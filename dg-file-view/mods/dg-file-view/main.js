@@ -1897,7 +1897,13 @@ export default class FileView extends View {
           blocks.length,
           (i) => `${i}`,
           (i) => div().px(20).py(6).child(this.renderMdBlock(blocks[i], i, cx)),
-        ).size_full(),
+        )
+          // One handler for the whole list: gpui-kit throws on a handler registered inside the item renderer.
+          .on_item_click((key, cx) => {
+            const ready = this.mermaidReady(blocks[Number(key)]);
+            if (ready) this.showMermaid(this.readyDiagrams().indexOf(ready), cx);
+          })
+          .size_full(),
       )
       .child(Scrollbar.vertical(id).absolute().inset_0());
   }
