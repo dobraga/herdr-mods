@@ -1909,7 +1909,7 @@ export default class FileView extends View {
         .pl(1.5)
         .pr(8)
         .items_center()
-        .child(div().w(numW).flex_none().text_right().text_color(t.dim).child(String(i + 1)))
+        .child(div().w(numW).flex_none().text_right().text_color(t.muted).child(String(i + 1)))
         .child(body);
     };
     return div()
