@@ -1779,6 +1779,7 @@ export default class FileView extends View {
     const n = ((idx % list.length) + list.length) % list.length;
     if (!this.mermaidZoom) this.savedMediaData = this.mediaData;
     this.mermaidIdx = n;
+    this.focusHandle?.focus();
     this.mermaidZoom = { relPath: list[n].relPath, width: list[n].width, height: list[n].height };
     this.mediaData = this.mermaidZoom;
     this.imgFit = true;
@@ -2116,6 +2117,14 @@ export default class FileView extends View {
       .text_size(13)
       .on_key_down((e, cx) => {
         const k = e.key?.toLowerCase();
+        if (this.mermaidZoom) {
+          if (k === "escape") this.closeMermaidZoom(cx);
+          else if (k === "left") this.showMermaid((this.mermaidIdx ?? 0) - 1, cx);
+          else if (k === "right") this.showMermaid((this.mermaidIdx ?? 0) + 1, cx);
+          else return;
+          cx.stop_propagation();
+          return;
+        }
         if (
           k === "s" &&
           (e.modifiers?.control || e.modifiers?.platform) &&
