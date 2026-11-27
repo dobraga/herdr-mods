@@ -1896,7 +1896,14 @@ export default class FileView extends View {
           id,
           blocks.length,
           (i) => `${i}`,
-          (i) => div().px(20).py(6).child(this.renderMdBlock(blocks[i], i, cx)),
+          (i) => {
+            // A finished diagram opens in the modal on click. on_mouse_down without .id(): a stateful
+            // (.id + on_click) element inside a list row made the diagram disappear.
+            const ready = this.mermaidReady(blocks[i]);
+            let row = div().px(20).py(6);
+            if (ready) row = row.on_mouse_down("left", (_e, cx) => this.showMermaid(this.readyDiagrams().indexOf(ready), cx));
+            return row.child(this.renderMdBlock(blocks[i], i, cx));
+          },
         ).size_full(),
       )
       .child(Scrollbar.vertical(id).absolute().inset_0());
