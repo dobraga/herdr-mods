@@ -1832,28 +1832,54 @@ export default class FileView extends View {
     cx.notify();
   }
 
+  // The document stays rendered; a diagram opens as a modal over it (backdrop + framed viewer).
   renderMdPreview(cx, slot, fullPath) {
-    if (this.mermaidZoom) {
-      const t = theme();
-      return v_flex()
-        .flex_1()
-        .min_h(0)
-        .child(
-          h_flex()
-            .h(34)
-            .flex_none()
-            .px(12)
-            .items_center()
-            .gap(8)
-            .border_b(1)
-            .border_color(t.border)
-            .child(pillBtn("fv-mmd-back", "← Back to document", false, t, (_e, cx) => this.closeMermaidZoom(cx)))
-            .child(pillBtn("fv-mmd-prev", "‹ Prev", false, t, (_e, cx) => this.showMermaid((this.mermaidIdx ?? 0) - 1, cx)))
-            .child(pillBtn("fv-mmd-next", "Next ›", false, t, (_e, cx) => this.showMermaid((this.mermaidIdx ?? 0) + 1, cx)))
-            .child(div().text_size(11.5).text_color(t.muted).child(`${(this.mermaidIdx ?? 0) + 1} / ${this.readyDiagrams().length}`)),
-        )
-        .child(renderImageView(this, slot, fullPath, t));
-    }
+    const base = this.renderMdList(cx);
+    if (!this.mermaidZoom) return base;
+    const t = theme();
+    const n = this.readyDiagrams().length;
+    const bar = h_flex()
+      .h(36)
+      .flex_none()
+      .px(12)
+      .items_center()
+      .gap(8)
+      .bg(t.chrome)
+      .border_b(1)
+      .border_color(t.border)
+      .child(div().flex_1().min_w(0).text_size(12).text_color(t.foreground).child(`Diagram ${(this.mermaidIdx ?? 0) + 1} / ${n}`))
+      .when(n > 1, (el) =>
+        el
+          .child(pillBtn("fv-mmd-prev", "‹ Prev", false, t, (_e, cx) => this.showMermaid((this.mermaidIdx ?? 0) - 1, cx)))
+          .child(pillBtn("fv-mmd-next", "Next ›", false, t, (_e, cx) => this.showMermaid((this.mermaidIdx ?? 0) + 1, cx))),
+      )
+      .child(pillBtn("fv-mmd-close", "✕ Close", false, t, (_e, cx) => this.closeMermaidZoom(cx)));
+    return v_flex()
+      .relative()
+      .flex_1()
+      .min_h(0)
+      .child(base)
+      .child(
+        div()
+          .absolute()
+          .inset_0()
+          .p(28)
+          .bg("#000000b3")
+          .child(
+            v_flex()
+              .size_full()
+              .rounded(10)
+              .overflow_hidden()
+              .bg(t.background)
+              .border(1)
+              .border_color(t.border)
+              .child(bar)
+              .child(renderImageView(this, slot, fullPath, t)),
+          ),
+      );
+  }
+
+  renderMdList(cx) {
     if (this.mdBlocksSrc !== this.markdownText) {
       this.mdBlocks = splitMdBlocks(this.markdownText);
       this.mdBlocksSrc = this.markdownText;
