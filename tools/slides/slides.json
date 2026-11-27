@@ -279,19 +279,20 @@
     "crop": [
       [
         0.155,
-        0.945,
-        0.57,
+        0.96,
+        0.592,
         1.0
       ],
       [
-        0.57,
-        0.945,
+        0.592,
+        0.96,
         1.0,
         1.0
       ]
     ],
     "fade": [],
-    "template": "template-wide.html"
+    "template": "template-wide.html",
+    "split": true
   },
   "dg-workbench-layout": {
     "template": "template-wide.html",

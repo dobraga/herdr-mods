@@ -45,15 +45,14 @@ def render(mod: str, slide: dict) -> Path:
     """Crop the shot, fill the template and screenshot it into `<mod>/preview.png`."""
     shots = Path(os.environ.get("SHOTS", "/dev/shm/slideshots"))
     with tempfile.TemporaryDirectory() as tmp:
-        crop = Path(tmp) / "crop.png"
-        _crop(shots / f"{mod}.png", slide["crop"]).save(crop)
+        crops = _crops(shots / f"{mod}.png", slide, Path(tmp))
         html = Path(tmp) / "slide.html"
         html.write_text(
             _fill(
                 (HERE / slide.get("template", "template.html")).read_text(),
                 mod,
                 slide,
-                crop,
+                crops,
             )
         )
         out = REPO / mod / "preview.png"
@@ -90,7 +89,7 @@ def _crop(shot: Path, box: list) -> Image.Image:
         for part in parts
     ]
     width = max(part.width for part in parts)
-    out = Image.new("RGB", (width, sum(part.height for part in parts)))
+    out = Image.new("RGB", (width, sum(part.height for part in parts)), parts[-1].getpixel((2, parts[-1].height // 2)))
     y = 0
     for part in parts:
         out.paste(part, (0, y))
@@ -98,7 +97,7 @@ def _crop(shot: Path, box: list) -> Image.Image:
     return out
 
 
-def _fill(template: str, mod: str, slide: dict, image: Path) -> str:
+def _fill(template: str, mod: str, slide: dict, images: list[Path]) -> str:
     points = "".join(
         f"<li><span>{i:02d}</span>{escape(p)}</li>"
         for i, p in enumerate(slide["points"], 1)
@@ -109,12 +108,33 @@ def _fill(template: str, mod: str, slide: dict, image: Path) -> str:
         "tsize": str(_title_size(slide["title"])),
         "lead": escape(slide["lead"]),
         "points": points,
-        "image": f"file://{image}",
-        "mask": _mask(slide.get("fade", [])),
     }
+    figure = '<figure class="shot"><img src="{{image}}" style="{{mask}}"></figure>'
+    mask = _mask(slide.get("fade", []))
+    figures = "".join(
+        figure.replace("{{image}}", f"file://{image}").replace("{{mask}}", mask)
+        for image in images
+    )
+    template = template.replace(figure, figures)
     for key, value in values.items():
         template = template.replace("{{" + key + "}}", value)
     return template
+
+
+def _crops(shot: Path, slide: dict, tmp: Path) -> list[Path]:
+    """Save the crop as one image, or as one image per box when the slide sets `split`."""
+    boxes = slide["crop"]
+    if not (slide.get("split") and isinstance(boxes[0], list)):
+        boxes = [boxes]
+    paths = []
+    for i, box in enumerate(boxes):
+        path = tmp / f"crop{i}.png"
+        image = _crop(shot, box)
+        if len(boxes) > 1:
+            image = image.resize((1500, round(image.height * 1500 / image.width)), Image.LANCZOS)
+        image.save(path)
+        paths.append(path)
+    return paths
 
 
 def _title_size(title: str) -> int:
