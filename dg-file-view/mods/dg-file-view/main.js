@@ -145,6 +145,9 @@ function countOccurrences(text, q) {
 // search changes no spacing and keeps the scroll position); past it, a lazy list.
 const MD_PLAIN_MAX = 600;
 
+// The code Editor's line height (13px font): the search list uses the same, so rows and scroll positions line up.
+const CODE_ROW = 20.8;
+
 const HIT_BG = "#fde047";
 const HIT_CUR_BG = "#fb923c";
 const HIT_FG = "#1c1917";
@@ -1841,8 +1844,8 @@ export default class FileView extends View {
     // top line at the top), then move it onto the current match once that is in view.
     if (this.fileSearchOpen && this.fileSearchQuery.trim() && this.code && !this.inMdPreview()) {
       const lines = this.searchLines;
-      const top = Math.max(0, Math.round((this.codeScroll?.offset()?.y ?? 0) / 20));
-      const rows = Math.max(1, Math.floor((this.codeScroll?.viewport_size()?.height ?? 0) / 21));
+      const top = Math.max(0, Math.round((this.codeScroll?.offset()?.y ?? 0) / CODE_ROW));
+      const rows = Math.max(1, Math.floor((this.codeScroll?.viewport_size()?.height ?? 0) / CODE_ROW));
       const bottom = Math.min(lines.length - 1, top + rows - 1);
       const at = (line, col = 0) => { let o = 0; for (let i = 0; i < line; i++) o += (lines[i] ?? "").length + 1; return o + col; };
       const place = (o) => { try { this.code?.set_selected_range({ start: o, end: o }); } catch {} };
@@ -1900,7 +1903,7 @@ export default class FileView extends View {
       if (!text) body.child(div().child(" "));
       return h_flex()
         .w_full()
-        .h(20)
+        .h(CODE_ROW)
         .flex_none()
         .gap(20)
         .pl(5)
@@ -1914,12 +1917,12 @@ export default class FileView extends View {
       .min_h(0)
       .relative()
       .font_family(settings().font_family ?? "JetBrains Mono")
-      .text_size(12.5)
+      .text_size(13)
       .child(
         v_virtual_list(
           `fv-code-search-${this.slotId}`,
           lines.length,
-          20,
+          CODE_ROW,
           (i) => `${i}-${cur && cur.line === i ? cur.col : ""}-${this.fileSearchQuery}`,
           (range) => {
             const out = [];
