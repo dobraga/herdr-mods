@@ -54,7 +54,7 @@ Shipped/sibling mods used:
 
 `shared()` keys:
 - Read and written: `file-view.slots`, a map `slotId -> { spaceId, tabId, kind, path, root, on, name, preview, updatedAt }`. This mod creates entries (id `fv-<time>-<rand>`), re-uses or re-pins them, and prunes dead ones (tab gone, or no `tabId` after 5s). `dg-file-view` fills in `tabId` and keeps them up to date.
-- Read: `forge.state` (`byBranch["<provider:owner/repo>::<branch>"]` with `key`, `number`, `title`, `ciState`, `reviewState`, `conflicts`). Written by `dg-workspace-status`, read by `dg-prs`.
+- Read: `forge.state` (`byBranch["<provider:owner/repo>::<branch>"]` with `key`, `number`, `title`, `ciState`, `reviewState`, `conflicts`). Written by `dg-status-bar`, read by `dg-prs`.
 - Written: `forge.focusPrKey` `{ key, seq }`, consumed by `dg-prs`.
 
 Network and files: no direct network from JS, but `git fetch`, `pull` and `push` (buttons, plus the 5-minute auto-fetch) talk to the repo's remotes with the person's own git credentials. It reads no files itself (no `readTextFile`) and writes none; git works inside the repos it lists, which can be outside the mod folder.
@@ -74,7 +74,7 @@ Derived from Herdr's changes mod (Apache-2.0), see ../NOTICE.
 
 - **Runs programs and talks to remotes:** it runs `git` and `find` through `exec`, and fetch/pull/push/switch/commit/discard change the repo. Discard is destructive (`git clean -fdq` deletes untracked files); it is guarded only by the two-click arm. Say this before installing.
 - **Reads outside its folder:** it scans the focused pane's repos and the space folder's children (repos anywhere on disk or on a remote machine). It also reads `shared("file-view.slots")` and `shared("forge.state")` written by other mods.
-- **Depends on siblings:** without `dg-file-view` a click creates a slot and a tab that never renders; without `dg-workspace-status` publishing `forge.state` the PR chip never appears; without `dg-prs` and a layout with the `panel` block and `panel-body` stack containing a `prs` child, the chip click does nothing. The icon path `mods/workspace-chrome/branch.svg` must exist (Herdr ships it).
+- **Depends on siblings:** without `dg-file-view` a click creates a slot and a tab that never renders; without `dg-status-bar` publishing `forge.state` the PR chip never appears; without `dg-prs` and a layout with the `panel` block and `panel-body` stack containing a `prs` child, the chip click does nothing. The icon path `mods/workspace-chrome/branch.svg` must exist (Herdr ships it).
 - **Placement:** `place` is `none`; the layout has to mount `dg-changes` in a panel itself. The mod name is hard-coded in `openOverlay` (`mod: "dg-changes"`), so renaming the folder breaks the popups.
 - Popup heights are fixed in code: branch picker `min(branches, 9) * 28 + 58`, context menu 108 (local) or 76 (remote, no "Open with…").
 - Folder watch is skipped on remote machines, so they refresh by the 10s poll only. Only `github` and `bitbucket` remotes produce a slug for the PR chip.

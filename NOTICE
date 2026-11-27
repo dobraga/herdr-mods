@@ -8,7 +8,7 @@ Eight mods here are modified copies of mods shipped with herdr-app
   dg-files               <- files
   dg-spaces            <- spaces
   dg-tabs             <- tabs
-  dg-workspace-status   <- workspace-status
+  dg-status-bar   <- workspace-status
   dg-workspace-chrome  <- workspace-chrome
   dg-new-menu          <- new-menu
 Each of these carries changes from the upstream version; see its RECIPE.md.

@@ -4,7 +4,7 @@
 #   ./install.sh                 every mod + herdr-tasks (when bun is installed)
 #   ./install.sh dg-tasks dg-inbox   only these mods (herdr-tasks is installed when `dg-tasks` is among them)
 #   ./install.sh --no-tasks      every mod, without the scheduler
-#   ./install.sh --setup         also link our layout (dg-main-folders) and its keys, the setup the mods are built for
+#   ./install.sh --setup         also link our layout (dg-workbench-layout) and its keys, the setup the mods are built for
 #   ./install.sh --uninstall     remove the links (and the herdr-tasks login service)
 #
 # Mods are symlinked, so `git pull` here updates them. HERDR_APP_HOME picks another Herdr home.
@@ -58,21 +58,21 @@ link_mod() {
 # Our shared layout and keys (setup/). The layout is linked (a real file of yours is backed up);
 # keys are linked only when you have none, otherwise merge setup/keys.json by hand.
 install_setup() {
-  local layout="$home/layouts/dg-main-folders.json"
+  local layout="$home/layouts/dg-workbench-layout.json"
   mkdir -p "$home/layouts"
   if [ -e "$layout" ] && [ ! -L "$layout" ]; then
-    local backup="$home/.backups/layouts/dg-main-folders.json.$(date +%Y%m%d%H%M%S)"
+    local backup="$home/.backups/layouts/dg-workbench-layout.json.$(date +%Y%m%d%H%M%S)"
     mkdir -p "$(dirname "$backup")"
     mv "$layout" "$backup"
     echo "  backed up existing $layout -> $backup"
   fi
-  ln -sfn "$root/dg-main-folders/layouts/dg-main-folders.json" "$layout"
-  echo "  linked layout dg-main-folders (pick it in Settings > Look)"
+  ln -sfn "$root/dg-workbench-layout/layouts/dg-workbench-layout.json" "$layout"
+  echo "  linked layout dg-workbench-layout (pick it in Settings > Look)"
   if [ ! -e "$home/keys.json" ]; then
-    ln -s "$root/dg-main-folders/keys.json" "$home/keys.json"
+    ln -s "$root/dg-workbench-layout/keys.json" "$home/keys.json"
     echo "  linked keys.json"
   else
-    echo "  keys.json already exists: merge $root/dg-main-folders/keys.json by hand"
+    echo "  keys.json already exists: merge $root/dg-workbench-layout/keys.json by hand"
   fi
 }
 
@@ -93,8 +93,8 @@ uninstall_all() {
   for name in "$@"; do
     [ -L "$home/mods/$name" ] && rm "$home/mods/$name" && echo "  unlinked $name"
   done
-  if [ -L "$home/layouts/dg-main-folders.json" ]; then
-    rm "$home/layouts/dg-main-folders.json" && echo "  unlinked layout dg-main-folders"
+  if [ -L "$home/layouts/dg-workbench-layout.json" ]; then
+    rm "$home/layouts/dg-workbench-layout.json" && echo "  unlinked layout dg-workbench-layout"
   fi
   # The scheduler goes only when the tasks mod does
   if printf '%s\n' "$@" | grep -qx dg-tasks && [ -x "$tasks_dir/bin/herdr-tasks" ] && command -v bun > /dev/null 2>&1; then

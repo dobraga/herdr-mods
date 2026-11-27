@@ -268,7 +268,7 @@
       0.99
     ]
   },
-  "dg-workspace-status": {
+  "dg-status-bar": {
     "title": "Status Bar",
     "lead": "Your workspace at a glance.",
     "points": [
@@ -277,15 +277,23 @@
       "Live CPU, memory, disk and network"
     ],
     "crop": [
-      0.0,
-      0.0,
-      1.0,
-      1.0
+      [
+        0.155,
+        0.945,
+        0.57,
+        1.0
+      ],
+      [
+        0.57,
+        0.945,
+        1.0,
+        1.0
+      ]
     ],
     "fade": [],
     "template": "template-wide.html"
   },
-  "dg-main-folders": {
+  "dg-workbench-layout": {
     "template": "template-wide.html",
     "title": "Main Folders",
     "lead": "Folders, agents and panels in one layout.",

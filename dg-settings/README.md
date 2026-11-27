@@ -47,7 +47,7 @@ The mod is an overlay dialog (`place: none`), so it needs no layout slot. Bind a
 
 ## Requirements
 
-- Companion mods in the same repo, since it reads their settings and icons: `dg-prs` (its `forge-helper.py` powers the GitHub & Bitbucket tab, which shows errors without it), `dg-spaces`, `dg-workspace-status`, `dg-files`, `dg-tasks`, `dg-inbox`, `new-chat`.
+- Companion mods in the same repo, since it reads their settings and icons: `dg-prs` (its `forge-helper.py` powers the GitHub & Bitbucket tab, which shows errors without it), `dg-spaces`, `dg-status-bar`, `dg-files`, `dg-tasks`, `dg-inbox`, `new-chat`.
 - Programs it runs: `hc` (Machines), `python3` and `gh` (GitHub tab), and optionally `claude` and `agy` (Inbox tab, via `--help`).
 - Network: only through the helper script and `hc machine` commands.
 - Outside its folder it writes `keys.json`, `settings.json`, other mods' `data/` files and `~/.config/herdr-space-folders.json`.

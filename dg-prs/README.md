@@ -46,7 +46,7 @@ The mod has `"place": "none"`, so it is not placed by itself. Dock it in a layou
 
 ## Requirements
 
-- Companion mods in this repo: `dg-workspace-status` (runs the sync and provides the PR data, without it the panel shows "Not synced yet"), `dg-spaces` (profiles) and `dg-settings` (configuration). Icons come from `workspace-chrome`. Install them with `./install.sh <name>`.
+- Companion mods in this repo: `dg-status-bar` (runs the sync and provides the PR data, without it the panel shows "Not synced yet"), `dg-spaces` (profiles) and `dg-settings` (configuration). Icons come from `workspace-chrome`. Install them with `./install.sh <name>`.
 - Programs on PATH: `python3` (3.9+), `git`, `find`, and `gh` logged in for GitHub. `claude` or `agy` for the agent buttons.
 - Network: the helper calls the GitHub GraphQL API (via the `gh` token) and the Bitbucket Cloud REST API (token from `BB_USER`/`BB_EMAIL` and `BB_TOKEN` env vars or stored config).
 - Files outside the mod folder: reads and writes `~/.config/herdr-forge.json` and `~/.cache/herdr-forge/`; reads `~/.config/herdr-space-folders.json`, `~/.env`, `~/.config/gh/hosts.yml`; scans `~/src/*` and your space folders for git repos. Review before installing.

@@ -52,7 +52,7 @@ The mod's `place` is `none`, so the layout has to mount it. Add a block to your 
 
 - `git` on the PATH of the machine the space runs on (also `find`, to discover repos). Works on remote machines too.
 - [`dg-file-view`](../file-view) in this repo, to render the diffs. Without it a click opens a tab that never renders.
-- Optional: `dg-workspace-status` (publishes the PR state) and `dg-prs` (target of the PR chip click, needs a layout with a `prs` child in a `panel-body` stack).
+- Optional: `dg-status-bar` (publishes the PR state) and `dg-prs` (target of the PR chip click, needs a layout with a `prs` child in a `panel-body` stack).
 - It runs `git` in your repos and talks to their remotes with your own git credentials (fetch, pull, push). Discard is destructive and only guarded by the two-click confirm.
 - The mod name is hard-coded for its popups: keep the folder named `dg-changes`.
 

@@ -40,7 +40,7 @@ Cards (anchored `top_center` popups, `t.popover` background, 10px radius, shadow
 
 ## Built from
 
-Files (all in `mods/dg-workspace-status/`):
+Files (all in `mods/dg-status-bar/`):
 - `mod.json`: `{ "place": "none", "cloned_from": { "name": "workspace-status", "version": "0.1.16" } }`. The bar is placed by the layout, not by the mod.
 - `main.js`: the `WorkspaceStatusUsage` View (render, timers, forge sync, usage fetch, popups).
 - `usage-card.js`, `sys-card.js`, `media-card.js`: pure element builders for the three cards.
@@ -67,7 +67,7 @@ Files read outside the mod folder: `~/.claude/.credentials.json`, `~/.cache/agy-
 ### Differences from upstream workspace-status
 
 Upstream (0.1.16) is a ~30-line view: computer, branch, agent count, spacer, palette hint, with no settings, no popups and no network. This fork adds:
-- Renamed class and mod `dg-workspace-status`; `mod.json` keeps `place: none` and `cloned_from`.
+- Renamed class and mod `dg-status-bar`; `mod.json` keeps `place: none` and `cloned_from`.
 - Per-item visibility, ring/bar/text style and thresholds from `data/workspace-status-usage/settings.json`.
 - Claude and Antigravity subscription usage pill and card, pace ticks, context-percent from `herdr-statusline`.
 - Focused-agent resolution (`agent-focus.js`), including chat-host terminals.
@@ -81,7 +81,7 @@ Upstream (0.1.16) is a ~30-line view: computer, branch, agent count, spacer, pal
 - **Reaches the network** (Anthropic OAuth usage endpoint with the person's Claude token, plus GitHub/Bitbucket via the PR helper) and **runs many programs** (see list). It **reads outside its folder**: Claude credentials, `~/.cache/*`, `/proc`, home directory sizes. Tell the person before adding it.
 - Requires siblings and non-Herdr programs when you want the matching part: `dg-prs` (supplies `forge-helper.py`, which needs `python3`; without it the PR chip, PRs counts and toasts stay empty); `dg-settings` (writes the settings file and `usage.settings`, and sets `forge.refreshReq`); `dg-spaces` (sets `space-folders.profile`). The layout must contain nodes `panel` and `panel-body` with a `prs` child, and `media-card` icons must exist or media button icons render blank. Optional: `agy` CLI, `nvidia-smi`, `busctl`/`wpctl` (Linux), `nowplaying-cli` (macOS), a statusline script writing `~/.cache/herdr-statusline/<terminal>.json` and `~/.cache/agy-statusline/quota.json`.
 - Provided to siblings: `forge.state` (read by `dg-spaces`, `dg-tabs`, `dg-changes`), `forge.focusPrKey`, `usage.*`, `sys.*`, `media.*`. Without this mod those PR chips and badges go blank.
-- `usage-card.js` loads `icons/claude.svg` and `icons/antigravity.svg` with a relative path, but the folder ships `claude.svg` and `agy.svg` only: the Antigravity header icon in the card is missing and the relative path may not resolve. Use `mods/dg-workspace-status/icons/<name>.svg` like the rest of the code.
+- `usage-card.js` loads `icons/claude.svg` and `icons/antigravity.svg` with a relative path, but the folder ships `claude.svg` and `agy.svg` only: the Antigravity header icon in the card is missing and the relative path may not resolve. Use `mods/dg-status-bar/icons/<name>.svg` like the rest of the code.
 - The PR button, branch chip and toasts depend on the `prs` panel child existing; clicks do nothing otherwise.
 - `usage-settings.js` header comment lists only five keys; the real list is in `cfg`.
 - The `agy -p /usage` call has a 25s timeout and runs every 3 minutes; "not installed" (exit 127 or ENOENT) hides the Antigravity part. An expired Claude token shows "Claude OAuth token expired (run claude)"; the mod never refreshes the token.
@@ -93,7 +93,7 @@ Upstream (0.1.16) is a ~30-line view: computer, branch, agent count, spacer, pal
 
 ## Done when
 
-- `herdr-app check mods/dg-workspace-status` passes.
+- `herdr-app check mods/dg-status-bar` passes.
 - The bar shows computer, branch, "N agents" and the palette hint with the actual bound key; a blocked agent adds "· K needs you".
 - With Claude credentials present, the usage pill shows `5h`/`7d` percents with ring gauges; hover opens the Subscription Usage card, click pins it, close or second click unpins.
 - Setting `"style": "bar"` or `"text"` in `data/workspace-status-usage/settings.json` changes the gauge on the next refresh; `"showSystem": false` hides the system pill.

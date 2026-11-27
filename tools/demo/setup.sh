@@ -125,7 +125,7 @@ A
 chmod +x "$FH/.local/bin/agy"
 mkdir -p "$FH/.claude"
 echo '{"claudeAiOauth":{"accessToken":"demo-token","subscriptionType":"pro","expiresAt":4102444800000}}' > "$FH/.claude/.credentials.json"
-sed -i 's#https://api.anthropic.com/api/oauth/usage#http://127.0.0.1:8799/usage#' "$FH/.config/herdr-app/mods/dg-workspace-status/main.js"
+sed -i 's#https://api.anthropic.com/api/oauth/usage#http://127.0.0.1:8799/usage#' "$FH/.config/herdr-app/mods/dg-status-bar/main.js"
 
 # Mock PRs (GitHub profile "personal"): the helper's network call is stubbed in the demo copy
 echo '{"pollIntervalSec":30,"profiles":{"personal":{"github":{"enabled":true,"account":"octocat"}}}}' > "$FH/.config/herdr-forge.json"

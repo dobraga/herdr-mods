@@ -72,7 +72,7 @@ Binary lookup: `herdr-tasks` on PATH if `herdr-tasks version` exits 0, else `~/.
 - **Network / model**: no direct network access. Plain-text detection (off by default, `asks.plainText`) calls a model through `herdr-tasks ask`; capped at 6 calls per minute, each message classified once (hash cached in `state.json`), only when the last message looks like a question.
 - **Reads/writes outside its folder**: `~/.config/herdr-app/data/inbox/*` only (and the terminal contents of every supported agent).
 - **Depends on sibling mods** (it shows nothing for a source whose producer is absent; asks and agents still work):
-  - `dg-workspace-status` produces `forge.notifs` and `forge.focusPrKey`.
+  - `dg-status-bar` produces `forge.notifs` and `forge.focusPrKey`.
   - `dg-prs` consumes `forge.focusPrKey` and must be the `prs` child of the panel stack.
   - `dg-tasks` provides the Tasks panel (the `dg-tasks` child) and `herdr-tasks` data; `tasks/main.js` uses its own unrelated `dg-inbox` feed name.
   - `dg-spaces` produces `dg-spaces` and `space-folders.profile`.

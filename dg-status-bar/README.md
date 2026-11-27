@@ -9,12 +9,12 @@ Derived from Herdr's workspace-status mod (Apache-2.0), see [NOTICE](../NOTICE).
 ## Quick start
 
 1. Install the mod (see below), together with `dg-prs` if you want the PR parts.
-2. Mount `dg-workspace-status` in a layout block (this mod has no slot of its own).
+2. Mount `dg-status-bar` in a layout block (this mod has no slot of its own).
 3. Open Herdr: the bar appears. With Claude Code credentials present, the `5h` / `7d` usage rings fill in; hover them to open the Subscription Usage card.
 
 ## Install
 
-> Read ~/.config/herdr-app/AGENTS.md, then add this mod: https://github.com/dobraga/herdr-mods/tree/main/dg-workspace-status
+> Read ~/.config/herdr-app/AGENTS.md, then add this mod: https://github.com/dobraga/herdr-mods/tree/main/dg-status-bar
 
 <details>
 <summary>Install by hand</summary>
@@ -22,7 +22,7 @@ Derived from Herdr's workspace-status mod (Apache-2.0), see [NOTICE](../NOTICE).
 ```sh
 git clone https://github.com/dobraga/herdr-mods
 cd herdr-mods
-./install.sh dg-workspace-status
+./install.sh dg-status-bar
 ./install.sh dg-prs
 ```
 
@@ -31,7 +31,7 @@ This links the mod into `~/.config/herdr-app/mods`; `git pull` updates it.
 The mod's `place` is `none`, so the layout has to mount it. Add a block at the bottom of your layout (the author's layout uses a 28px-high block):
 
 ```json
-{ "id": "status", "type": "block", "size": { "px": 28 }, "content": { "mod": "dg-workspace-status" } }
+{ "id": "status", "type": "block", "size": { "px": 28 }, "content": { "mod": "dg-status-bar" } }
 ```
 
 </details>

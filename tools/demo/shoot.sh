@@ -26,7 +26,7 @@ snap() {
 
 # dg-desktop-toast goes last: its toast stays on screen and would cover the next shots
 all=(dg-files dg-changes dg-prs dg-loadout dg-tasks dg-inbox dg-tabs dg-spaces dg-agents
-  dg-workspace-chrome dg-workspace-status dg-file-view dg-file-picker dg-new-tab dg-settings dg-new-menu dg-desktop-toast)
+  dg-workspace-chrome dg-status-bar dg-file-view dg-file-picker dg-new-tab dg-settings dg-new-menu dg-desktop-toast)
 mods=("${@:-${all[@]}}")
 
 for mod in "${mods[@]}"; do
@@ -40,7 +40,7 @@ for mod in "${mods[@]}"; do
     dg-files | dg-changes | dg-prs | dg-loadout | dg-tasks | dg-inbox)
       panel "${mod#dg-}"; [ "$mod" = dg-inbox ] && sleep "${INBOX_WAIT:-45}"  # PR alerts need a second sync
       snap "$mod" ;;
-    dg-tabs | dg-spaces | dg-agents | dg-workspace-chrome | dg-workspace-status)
+    dg-tabs | dg-spaces | dg-agents | dg-workspace-chrome | dg-status-bar)
       panel files; snap "$mod" ;;
     dg-file-view)
       act tab.new --name README.md --mod dg-file-view --props \
@@ -49,7 +49,7 @@ for mod in "${mods[@]}"; do
     dg-file-picker | dg-new-tab | dg-settings)
       act mod.open --name "$mod"
       sleep 2; snap "$mod"; act overlay.close ;;
-    dg-main-folders)  # the whole layout, with the Inbox panel open
+    dg-workbench-layout)  # the whole layout, with the Inbox panel open
       panel inbox; sleep "${INBOX_WAIT:-45}"; snap "$mod" ;;
     dg-new-menu)  # opened by the tab bar's + as a popup; as a pane it shows the same menu
       act pane.split --direction right --mod dg-new-menu; sleep 2; snap "$mod"; act pane.close ;;

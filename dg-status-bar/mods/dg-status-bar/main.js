@@ -92,12 +92,12 @@ function gauge(pct, color, t, pace) {
     .size(12)
     .flex_none()
     .relative()
-    .child(svg("mods/dg-workspace-status/rings/track.svg").size(12).absolute().top(0).left(0).text_color(t.raised))
-    .when(step > 0, (el) => el.child(svg(`mods/dg-workspace-status/rings/arc-${step}.svg`).size(12).absolute().top(0).left(0).text_color(color)));
+    .child(svg("mods/dg-status-bar/rings/track.svg").size(12).absolute().top(0).left(0).text_color(t.raised))
+    .when(step > 0, (el) => el.child(svg(`mods/dg-status-bar/rings/arc-${step}.svg`).size(12).absolute().top(0).left(0).text_color(color)));
 }
 
 function brandIcon(name, t, loading) {
-  return svg(`mods/dg-workspace-status/icons/${name}.svg`).size(name === "agy" ? 10 : 13).flex_none().text_color(loading ? t.working : t.muted);
+  return svg(`mods/dg-status-bar/icons/${name}.svg`).size(name === "agy" ? 10 : 13).flex_none().text_color(loading ? t.working : t.muted);
 }
 
 async function loadSettings() {
@@ -546,7 +546,7 @@ export default class WorkspaceStatusUsage extends View {
   }
 
   sysPill(s, t) {
-    const icon = (name) => svg(`mods/dg-workspace-status/icons/${name}.svg`).size(13).flex_none().text_color(t.dim);
+    const icon = (name) => svg(`mods/dg-status-bar/icons/${name}.svg`).size(13).flex_none().text_color(t.dim);
     const pct = (name, v) => h_flex().gap(5).items_center().child(icon(name))
       .child(div().w(30).flex_none().text_right().text_color(v == null ? t.dim : pctColor(v, t)).child(v == null ? "\u2007–%" : `${pad2(v)}%`));
     const isOpen = Boolean(shared("sys.open"));

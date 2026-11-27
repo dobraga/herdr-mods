@@ -55,7 +55,7 @@ The stack is `panel-body` inside a node with id `panel`. The `dg-tabs` mod adds 
 - `hc` on PATH: Inbox reads agent terminals and types keys and text into them. Only Claude Code, Codex, Pi and Antigravity agents are read, and detection is heuristic, so a UI change in an agent can break cards (it then shows as a plain `AGENT` row).
 - `herdr-tasks` (optional): needed for the Tasks source and the plain-text classifier. Install it with `./install.sh dg-tasks` (requires bun).
 - Network: Inbox has no direct network access. The optional plain-text detection (`asks.plainText`, off by default) calls a model through `herdr-tasks ask`, at most 6 calls per minute.
-- Companion mods (the other sources show nothing without them; asks and agents still work): `dg-tabs` hosts the panel, `dg-workspace-status` provides PR alerts, `dg-prs` and `dg-tasks` are the panel pages opened from rows, `dg-spaces` provides profiles.
+- Companion mods (the other sources show nothing without them; asks and agents still work): `dg-tabs` hosts the panel, `dg-status-bar` provides PR alerts, `dg-prs` and `dg-tasks` are the panel pages opened from rows, `dg-spaces` provides profiles.
 - Files outside the mod folder: only `~/.config/herdr-app/data/inbox/`.
 
 See [RECIPE.md](RECIPE.md) for how it is built.

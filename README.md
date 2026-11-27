@@ -33,15 +33,15 @@ cd ~/src/herdr-mods
 
 Mods (`<name>/mods/<name>/`) are symlinked into `~/.config/herdr-app/mods/`, so `git pull` updates them. An existing real folder with the same name is moved to `~/.config/herdr-app/.backups/mods/`.
 
-### The layout (`dg-main-folders/`)
+### The layout (`dg-workbench-layout/`)
 
-The mods are built for our layout, [dg-main-folders](dg-main-folders/README.md): folders in the sidebar, a tab bar with the Files, Changes, PRs, Loadout, Tasks and Inbox panels, and a status bar.
+The mods are built for our layout, [dg-workbench-layout](dg-workbench-layout/README.md): folders in the sidebar, a tab bar with the Files, Changes, PRs, Loadout, Tasks and Inbox panels, and a status bar.
 
 ```sh
 ./install.sh --setup    # also links the layout and, if you have none, its keys.json
 ```
 
-Then pick `dg-main-folders` in Settings > Look. If you already have a `keys.json`, merge `dg-main-folders/keys.json` into it by hand. `setup/` and `tools/sync-layout.sh` keep that folder in step with the dotfiles repo, which owns the layout.
+Then pick `dg-workbench-layout` in Settings > Look. If you already have a `keys.json`, merge `dg-workbench-layout/keys.json` into it by hand. `setup/` and `tools/sync-layout.sh` keep that folder in step with the dotfiles repo, which owns the layout.
 
 ### The Tasks scheduler (`tools/tasks`)
 
@@ -74,7 +74,7 @@ Eight are modified forks of Herdr's own mods (Apache-2.0, see [NOTICE](NOTICE)).
 | `dg-tabs` | A top tab bar for Herdr's window. |
 | `dg-tasks` | A side panel for the folder you are working in. |
 | `dg-workspace-chrome` | The thin strip at the top of the Herdr sidebar and the Settings / Add machine footer at the bottom of it. |
-| `dg-workspace-status` | A status bar along the bottom of the window (a chrome-colored strip with a top border). |
+| `dg-status-bar` | A status bar along the bottom of the window (a chrome-colored strip with a top border). |
 
 License: Apache-2.0.
 

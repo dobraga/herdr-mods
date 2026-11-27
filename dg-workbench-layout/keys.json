@@ -80,7 +80,7 @@
     "ctrl-insert": "terminal.copy",
     "shift-insert": "terminal.paste"
   },
-  "layout:dg-main-folders": {
+  "layout:dg-workbench-layout": {
     "alt-down": "dg-spaces.next",
     "alt-up": "dg-spaces.prev",
     "ctrl-shift-pagedown": "dg-spaces.next",

@@ -3,7 +3,7 @@ import { v_flex, h_flex } from "gpui-base";
 import { cfg } from "./usage-settings.js";
 import { fmtRate, fmtBytes, pad2, HIST_LEN } from "./sysstats.js";
 
-const icon = (name, t) => svg(`mods/dg-workspace-status/icons/${name}.svg`).size(14).flex_none().text_color(t.muted);
+const icon = (name, t) => svg(`mods/dg-status-bar/icons/${name}.svg`).size(14).flex_none().text_color(t.muted);
 const pctColor = (v, t) => (v >= cfg.critical ? t.ansi1 : v >= cfg.warn ? t.blocked : t.ansi2);
 
 function bar(pct, t) {

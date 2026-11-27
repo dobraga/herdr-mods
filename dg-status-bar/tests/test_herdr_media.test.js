@@ -1,5 +1,5 @@
 import { test, expect } from "bun:test";
-import { parseListOutput, parseMetadata, pickActive, signature, sendCommand, fmtTime, pillLabel, brandOf } from "../mods/dg-workspace-status/media.js";
+import { parseListOutput, parseMetadata, pickActive, signature, sendCommand, fmtTime, pillLabel, brandOf } from "../mods/dg-status-bar/media.js";
 
 test("parseListOutput keeps only mpris names", () => {
   const out = "org.mpris.MediaPlayer2.brave.instance1 1 brave u :1.1\n:1.5 2 x\norg.freedesktop.DBus 1 dbus";

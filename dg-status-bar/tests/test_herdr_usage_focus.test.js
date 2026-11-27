@@ -1,5 +1,5 @@
 import { test, expect } from "bun:test";
-import { classifyAgent, resolveFocusedAgent } from "../mods/dg-workspace-status/agent-focus.js";
+import { classifyAgent, resolveFocusedAgent } from "../mods/dg-status-bar/agent-focus.js";
 
 test("classifyAgent recognizes Claude and AGY variants", () => {
   expect(classifyAgent("claude", "")).toBe("claude");
