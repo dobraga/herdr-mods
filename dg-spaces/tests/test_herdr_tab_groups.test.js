@@ -57,7 +57,7 @@ test("all tabs moved: the host is emptied; virtual row status shows the most urg
   const main = space("s1", [{ id: "t1", status: "working" }, { id: "t2", status: "blocked" }]);
   const anchor = space("s0", [{ id: "t0" }]);
   const ps = [pane("t0", MAIN), pane("t1", WT), pane("t2", WT)];
-  const out = groupTabs([row(anchor, 0, MAIN), { ...row(main, 1, "/tmp/else"), g: null }], ps, git);
+  const out = groupTabs([row(anchor, 0, MAIN), { ...row(main, 1, "/tmp/else"), g: info("/tmp/else", "x", false) }], ps, git);
   const host = out.find((r) => r.w.id === "s1");
   expect(host.emptied).toBe(true);
   expect(out.find((r) => r.virtual).w.status).toBe("blocked");
@@ -83,4 +83,49 @@ test("worktreesFirst puts each checkout's worktrees before it", async () => {
   const r = (id, tree = null) => ({ w: { id }, tree });
   expect(worktreesFirst([r("a"), r("w1", "├─"), r("w2", "└─"), r("b"), r("w3", "└─"), r("c")]).map((x) => x.w.id))
     .toEqual(["w1", "w2", "a", "w3", "b", "c"]);
+});
+
+test("a tab in a non-git folder other than its space's gets a row named by the folder", () => {
+  const main = space("s1", [{ id: "t1" }, { id: "t2" }, { id: "t3" }]);
+  const ps = [pane("t1", MAIN), pane("t2", "/tmp/else"), pane("t3", MAIN + "/src")];
+  const g = { ...git, [key("/tmp/else")]: null, [key(MAIN + "/src")]: info(MAIN, "master", false) };
+  const out = groupTabs([row(main, 0, MAIN)], ps, g);
+  expect(out.map((r) => r.w.name)).toEqual(["s1", "else"]);
+  expect(out[1].virtual).toBe(true);
+  expect(out[1].g).toBeNull();
+  expect(out[0].items.map((x) => x.tab.id)).toEqual(["t1", "t3"]);
+  expect(out[1].items.map((x) => x.tab.id)).toEqual(["t2"]);
+});
+
+test("a subfolder of a non-git space's folder is the same place; unasked git keeps the tab", () => {
+  const s = space("s1", [{ id: "t1" }, { id: "t2" }, { id: "t3" }]);
+  const ps = [pane("t1", "/tmp/a"), pane("t2", "/tmp/a/b"), pane("t3", "/tmp/c")];
+  const g = { [key("/tmp/a")]: null, [key("/tmp/a/b")]: null };
+  const out = groupTabs([{ w: s, i: 0, g: null, tree: null }], ps, g);
+  expect(out).toHaveLength(1);
+  expect(out[0].items).toHaveLength(3);
+});
+
+test("a plain folder never joins an existing space: it gets its own row", () => {
+  const main = space("s1", [{ id: "t1" }, { id: "t2" }]);
+  const home = space("s2", [{ id: "t3" }]);
+  const ps = [pane("t1", MAIN), pane("t2", "/h"), pane("t3", "/h")];
+  const g = { ...git, [key("/h")]: info("/h", "main", false) };
+  const out = groupTabs([row(main, 0, MAIN), { w: home, i: 1, g: g[key("/h")], tree: null }], ps, g);
+  const v = out.find((r) => r.virtual);
+  expect(v.w.name).toBe("h");
+  expect(v.items.map((x) => x.tab.id)).toEqual(["t2"]);
+  expect(out.find((r) => r.w.id === "s2").items.map((x) => x.tab.id)).toEqual(["t3"]);
+  expect(out.map((r) => r.w.name)).toEqual(["s1", "h", "s2"]);
+});
+
+test("two spaces with a tab in the same plain folder each get their own row under themselves", () => {
+  const a = space("a", [{ id: "t1" }, { id: "t2" }]);
+  const b = space("b", [{ id: "t3" }, { id: "t4" }]);
+  const ps = [pane("t1", MAIN), pane("t2", "/h"), pane("t3", "/tmp/x"), pane("t4", "/h")];
+  const g = { ...git, [key("/h")]: null, [key("/tmp/x")]: null };
+  const out = groupTabs([{ w: a, i: 0, g: git[key(MAIN)], tree: null }, { w: b, i: 1, g: null, tree: null }], ps, g);
+  expect(out.map((r) => r.w.name)).toEqual(["a", "h", "b", "h"]);
+  expect(out[1].items.map((x) => x.tab.id)).toEqual(["t2"]);
+  expect(out[3].items.map((x) => x.tab.id)).toEqual(["t4"]);
 });

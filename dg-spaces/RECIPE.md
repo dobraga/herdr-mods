@@ -13,7 +13,7 @@ Top to bottom, on the chrome background (`t.chrome`), 13px text:
 - **Scrolling list**, 8px side padding, always-on scrollbar:
   - **Machine header** (26px, 11px dim), only when a machine other than this computer exists and no folder collects it: monitor/server icon, name ("This computer" for local), small folder-plus and "+" buttons, a 6px connection dot (`t.ansi2` connected, `t.dim` otherwise), chevron. Not-connected machines show their state text.
   - **Folder header** (30px, 8px radius): an 18px rounded tile in the folder's color with a white folder icon (grey `t.dim` when uncolored), the name (medium weight, truncated), then optional badges, a "+" button, the count of spaces (11.5px dim) and a down/right chevron. Colors: ansi6 `#22a99a`, ansi3 `#e3814f`, ansi4 `#5b8def`, ansi5 `#8b7cf6`, ansi2 `#3fae6a`, ansi1 `#d9649a`.
-  - **Spaces under a folder**, indented 18px more than loose ones (8px base; a machine nested in a folder: 26px header, 44px content). A checkout's own tabs sit directly under the folder with no row of their own; each worktree has a header row (28px) with a branch icon, tree lines "├─"/"└─", and its branch name, listed before the checkout's tabs. A worktree with no space of its own, only tabs working in it, gets a virtual row named after its branch.
+  - **Spaces under a folder**, indented 18px more than loose ones (8px base; a machine nested in a folder: 26px header, 44px content). A checkout's own tabs sit directly under the folder with no row of their own; each worktree has a header row (28px) with a branch icon, tree lines "├─"/"└─", and its branch name, listed before the checkout's tabs. A tab whose folder is not its space's own place (git top, else folder; a subfolder of a non-git place is the same) gets a virtual row of its own, named after its branch, or after the folder when it is not in git. Only a worktree's tabs join a space already on it; a plain folder always gets its own row. Tabs whose git is not known yet stay put.
   - **Space row** (30px): name (only if the person named it; unnamed checkouts hide the row), a git tail on the right: "repo · branch" only where unusual (master/main and names equal to the space or folder name are omitted), a PR chip `#123` (10px) tinted by state, green `↑n` ahead and red `↓n` behind, a chevron to open or close its tab list.
   - **Tab rows** (24px, 11.5px) under a space, joined by "├─"/"└─": a 12px program icon (or 6px dot), the tab label, a "!" badge when blocked. A split tab becomes one block (raised background) with one line per terminal pane and a "┃" connector.
   - **Compact style:** no worktree headers; one 24px line per space or worktree with a 12px icon per tab (agent, chat, shell, dg-file-view tab) and the branch (branch icon, max 110px) on the right.
@@ -48,7 +48,7 @@ Clicks, keys, hovers:
 Files (all in `mods/dg-spaces/`):
 - `mod.json`: `{ "place": "none", "title": "Space folders", "cloned_from": { "name": "spaces", "version": "0.1.10" } }`. No `props` roles; the mod is placed by a layout (sidebar slot) and opens itself as overlays via its own props: `folderMenu`, `edit`, `profileMenu`, `editProfile` (with `freshProfile`, `machine`, `fresh`).
 - `main.js` (~1650 lines): the `Spaces` view, folder and profile state, git cache, drag and drop, dialogs. Exports `rule`, `glyph`, `tone`.
-- `groups.js`: pure helpers `groupTabs`, `worktreesFirst`, `tabKey`, `leadCwd`; places a tab under the worktree its own cwd is in.
+- `groups.js`: pure helpers `groupTabs`, `worktreesFirst`, `tabKey`, `leadCwd`; places a tab under the place of its own cwd (a git top, else the folder).
 - `icon-for.js`: picks a Material Icon Theme icon for a file name; `iconPath` returns `mods/dg-files/icons/<icon>.svg`.
 - `icon-map.js`: generated lookup tables (extension, file name, folder name -> icon), MIT, from material-extensions/vscode-material-icon-theme. Do not hand-write it.
 - `preview.png` is the screenshot.
@@ -102,7 +102,7 @@ Derived from Herdr's spaces mod (Apache-2.0), see ../NOTICE.
 - Dragging a space onto the folder header puts it in the folder; dropping it on the empty list takes it out.
 - A folder with rule `~/code/*` collects a space whose terminal is in `~/code/x`.
 - A folder's "+" opens a space in its start path.
-- A space in a linked git worktree appears under its checkout with a branch row; a tab whose cwd is in a worktree is listed under that worktree.
+- A space in a linked git worktree appears under its checkout with a branch row; a tab whose cwd is in a worktree, or in any other folder than its space's, is listed under a row for that place (below its checkout when listed, else below its space).
 - A blocked agent shows a `t.blocked` "!" badge, a finished one a "✓" badge, a working one a spinner; a folded folder sums them.
 - Clicking a tab row selects its space, tab and (for a split) pane.
 - Clicking a profile chip hides spaces of other profiles; moving focus into another profile's space switches the chip.

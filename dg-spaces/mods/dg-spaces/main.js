@@ -877,7 +877,7 @@ export default class Spaces extends View {
     let run_ = [];
     const flush = () => {
       if (!run_.length) return;
-      const els = this.compactRows(run_.map((r) => ({ r, branch: r.tree ? (r.g?.branch ?? r.w.name) : null })), t);
+      const els = this.compactRows(run_.map((r) => ({ r, branch: r.tree ? (r.virtual && !r.g?.linked ? r.w.name : (r.g?.branch ?? r.w.name)) : null, worktree: Boolean(r.g?.linked) })), t);
       if (run_.some((r) => r.w.active) && els.length) this.activeEl = els[0];
       out.push(...els);
       run_ = [];
@@ -1306,10 +1306,10 @@ export default class Spaces extends View {
       const pool = terms.length ? terms : all;
       return pool.find((p) => p.program?.agent) ?? pool.find((p) => p.focused) ?? pool[0];
     };
-    const lines = groups.flatMap(({ r, branch }) => {
+    const lines = groups.flatMap(({ r, branch, worktree }) => {
       const entries = (r.items ?? (r.w.tabs ?? []).map((tab) => ({ w: r.w, tab }))).map((x) => ({ ...x, lead: leadOf(x.tab) }));
       // One line per space/worktree, its tabs in the tab bar's order.
-      return entries.length ? [Object.assign(entries, { branch })] : [];
+      return entries.length ? [Object.assign(entries, { branch, worktree })] : [];
     });
     const icon = (pane, bright) => {
       const prog = pane?.program;
@@ -1359,7 +1359,7 @@ export default class Spaces extends View {
         .child(div().flex_none().text_color(t.dim).child(n === lines.length - 1 ? "└─" : "├─"))
         .child(h_flex().flex_1().min_w(0).gap(2).items_center().children(icons))
         .when(Boolean(line.branch), (el) => el.child(h_flex().flex_none().max_w(110).gap(4).items_center().text_color(t.dim)
-          .child(svg("mods/workspace-chrome/branch.svg").size(11).flex_none())
+          .child(svg(line.worktree ? "mods/workspace-chrome/branch.svg" : "mods/workspace-chrome/folder.svg").size(11).flex_none())
           .child(div().min_w(0).truncate().child(line.branch))))
         .when(blocked, (el) => el.child(div().size(14).flex_none().rounded(4).bg(t.blocked + "26").text_size(10.5).font_bold().text_color(t.blocked).flex().items_center().justify_center().child("!")));
     });
@@ -1427,7 +1427,7 @@ export default class Spaces extends View {
         h_flex()
           .gap(9)
           .items_center()
-          .when(Boolean(tree), el => el.pl(folder ? 0 : 22).child(svg("mods/workspace-chrome/branch.svg").size(13).text_color(t.dim)))
+          .when(Boolean(tree), el => el.pl(folder ? 0 : 22).child(svg(g?.linked ? "mods/workspace-chrome/branch.svg" : "mods/workspace-chrome/folder.svg").size(13).text_color(t.dim)))
           .when(showLeftName, el => el.child(div().flex_initial().min_w(SIDE_MIN).truncate().text_color(t.foreground).child(w.name)))
           .child(g || tree || w.named ? this.gitTail(g, tree, w, t, folderName, !folder || Boolean(tree), Boolean(tree && folder)) : div().flex_1())
           .when(blockedCount > 0, (el) => el.child(blockedBadge(t, blockedCount)))
