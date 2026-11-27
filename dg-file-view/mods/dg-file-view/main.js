@@ -1798,6 +1798,14 @@ export default class FileView extends View {
         }
       });
     }
+    // Start at the first match from the cursor on (where you clicked), not always the top of the file.
+    if (jump && this.fileMatches.length && this.code) {
+      const at = this.code.selected_range()?.start ?? 0;
+      let n = 0, line = 0;
+      for (; line < lines.length && n + lines[line].length < at; line++) n += lines[line].length + 1;
+      const first = this.fileMatches.findIndex((m) => m.line >= line);
+      this.fileMatchIdx = first < 0 ? 0 : first;
+    }
     if (jump) this.showFileMatch(cx);
   }
 
@@ -1828,6 +1836,14 @@ export default class FileView extends View {
   }
 
   closeFileSearch(cx) {
+    // The Editor cannot be scrolled from code and restarts at the top when it comes back: park its cursor on the
+    // match you were on, which it scrolls into view.
+    const m = this.fileSearchOpen && this.fileSearchQuery.trim() ? this.fileMatches[this.fileMatchIdx] : null;
+    if (m && this.code && !this.inMdPreview()) {
+      let off = 0;
+      for (let i = 0; i < m.line; i++) off += (this.searchLines[i] ?? "").length + 1;
+      try { this.code.set_selected_range({ start: off + m.col, end: off + m.col }); } catch {}
+    }
     this.fileSearchOpen = false;
     this.focusHandle.focus();
     cx.notify();
