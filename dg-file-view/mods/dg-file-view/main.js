@@ -182,8 +182,29 @@ function mdLineSegs(l) {
   return l.kind === "row" ? l.cells.flat() : (l.segs ?? []);
 }
 
+// A fenced code block's language tag and lines, or null (not fenced, unterminated, a mermaid diagram or huge).
+function fenceBody(block) {
+  const m = /^\s*(```|~~~)([^\n]*)\n([\s\S]*?)\n?[ \t]*\1[ \t]*$/.exec(block);
+  if (!m) return null;
+  const tag = m[2].trim().split(/[\s{]/)[0].toLowerCase();
+  const rows = m[3].split("\n").map((r) => r.replace(/\t/g, "  "));
+  return tag === "mermaid" || rows.length > 400 ? null : { tag, rows };
+}
+
+// Hit ranges [start, end) of `q` (lowercase) in a line.
+function hitRanges(text, q) {
+  const out = [];
+  const lower = text.toLowerCase();
+  let at, pos = 0;
+  while (q && (at = lower.indexOf(q, pos)) !== -1) { out.push([at, at + q.length]); pos = at + q.length; }
+  return out;
+}
+
 function countBlockHits(block, q) {
-  if (isFencedBlock(block)) return 0;
+  if (isFencedBlock(block)) {
+    const body = fenceBody(block);
+    return body ? body.rows.reduce((n, r) => n + hitRanges(r, q).length, 0) : 0;
+  }
   // Cheap prefilter: a segment can only match if the raw block text does, so skip the parse otherwise.
   if (!block.toLowerCase().includes(q)) return 0;
   let n = 0;
@@ -248,6 +269,59 @@ function renderMdMatchBlock(block, q, currentLocal, t) {
     else col.child(inline(l.segs));
   });
   return col;
+}
+
+// A fenced code block drawn by hand in syntax colors (the Markdown view cannot color text), with the
+// search hits painted over it (`currentLocal` is the current hit's number in this block); null when it
+// is not one, so the caller falls back to the plain view.
+function codeCard(block, t, q = "", currentLocal = -1) {
+  const body = fenceBody(block);
+  if (!body) return null;
+  const { tag, rows } = body;
+  const lang = languageByTag(tag);
+  const tone = { keyword: t.ansi5, string: t.ansi2, comment: t.dim, function: t.ansi4, type: t.ansi3, number: t.ansi6, constant: t.ansi6 };
+  let open = null, hit = 0;
+  const lines = rows.map((text) => {
+    let tokens = null;
+    if (tag === "diff") {
+      const c = text.startsWith("+") ? t.ansi2 : text.startsWith("-") ? t.ansi1 : text.startsWith("@@") ? t.ansi6 : t.foreground;
+      tokens = [{ kind: "", text, color: c }];
+    } else if (lang && text.length <= 400) {
+      try { const r = tokenize(text, lang, open); open = r.open; tokens = r.tokens; } catch { tokens = null; }
+    }
+    tokens ??= [{ kind: "", text }];
+    const ranges = hitRanges(text, q).map(([a, b]) => ({ a, b, cur: hit++ === currentLocal }));
+    const row = h_flex().flex_none().whitespace_nowrap().min_h(18);
+    let at = 0;
+    for (const k of tokens) {
+      const color = k.color ?? tone[k.kind] ?? t.foreground;
+      let pos = 0;
+      for (const r of ranges) {
+        const a = Math.max(r.a - at, pos), b = Math.min(r.b - at, k.text.length);
+        if (b <= a) continue;
+        if (a > pos) row.child(div().flex_none().text_color(color).child(k.text.slice(pos, a)));
+        row.child(div().flex_none().rounded(2).bg(r.cur ? HIT_CUR_BG : HIT_BG).text_color(HIT_FG).child(k.text.slice(a, b)));
+        pos = b;
+      }
+      if (pos < k.text.length) row.child(div().flex_none().text_color(color).child(k.text.slice(pos)));
+      at += k.text.length;
+    }
+    return text ? row : row.child(" ");
+  });
+  return v_flex()
+    .w_full()
+    .rounded(6)
+    .bg(t.raised)
+    .border(1)
+    .border_color(t.border)
+    .px(12)
+    .py(8)
+    .gap(1)
+    .overflow_hidden()
+    .font_family(settings().font_family ?? "JetBrains Mono")
+    .text_size(12.5)
+    .when(Boolean(tag), (el) => el.child(div().flex_none().text_size(10.5).text_color(t.dim).pb(2).child(tag)))
+    .children(lines);
 }
 
 export default class FileView extends View {
@@ -1826,53 +1900,11 @@ export default class FileView extends View {
     cx.notify();
   }
 
-  // A fenced code block drawn by hand in syntax colors (the Markdown view cannot color text); null when
-  // it is not one, is unterminated or huge, so the caller falls back to the plain view.
-  codeCard(block, t) {
-    const m = /^\s*(```|~~~)([^\n]*)\n([\s\S]*?)\n?[ \t]*\1[ \t]*$/.exec(block);
-    if (!m) return null;
-    const rows = m[3].split("\n");
-    if (rows.length > 400) return null;
-    const tag = m[2].trim().split(/[\s{]/)[0].toLowerCase();
-    const lang = languageByTag(tag);
-    const tone = { keyword: t.ansi5, string: t.ansi2, comment: t.dim, function: t.ansi4, type: t.ansi3, number: t.ansi6, constant: t.ansi6 };
-    let open = null;
-    const lines = rows.map((raw) => {
-      const text = raw.replace(/\t/g, "  ");
-      if (tag === "diff") {
-        const c = text.startsWith("+") ? t.ansi2 : text.startsWith("-") ? t.ansi1 : text.startsWith("@@") ? t.ansi6 : t.foreground;
-        return h_flex().flex_none().whitespace_nowrap().text_color(c).child(text || " ");
-      }
-      if (!lang || text.length > 400) return h_flex().flex_none().whitespace_nowrap().text_color(t.foreground).child(text || " ");
-      try {
-        const r = tokenize(text, lang, open);
-        open = r.open;
-        return h_flex().flex_none().whitespace_nowrap().children(r.tokens.map((k) => div().flex_none().text_color(tone[k.kind] ?? t.foreground).child(k.text)));
-      } catch {
-        return h_flex().flex_none().whitespace_nowrap().text_color(t.foreground).child(text || " ");
-      }
-    });
-    return v_flex()
-      .w_full()
-      .rounded(6)
-      .bg(t.raised)
-      .border(1)
-      .border_color(t.border)
-      .px(12)
-      .py(8)
-      .gap(1)
-      .overflow_hidden()
-      .font_family(settings().font_family ?? "JetBrains Mono")
-      .text_size(12.5)
-      .when(Boolean(tag), (el) => el.child(div().flex_none().text_size(10.5).text_color(t.dim).pb(2).child(tag)))
-      .children(lines);
-  }
-
   // A ```mermaid block draws as a rendered PNG (mmdr, cached by hash); until it is ready, or if it
   // fails, the block stays as code with the error underneath.
   renderMdBlock(block, i, cx) {
     const code = mermaidCode(block);
-    if (code === null) return this.codeCard(block, theme()) ?? TextView.markdown(`fv-md-${this.slotId}-p${i}`, block);
+    if (code === null) return codeCard(block, theme()) ?? TextView.markdown(`fv-md-${this.slotId}-p${i}`, block);
     if (!this.mermaidCache) this.mermaidCache = new Map();
     // Drawn in the theme's colors so the PNG blends with the preview instead of a white card.
     const t = theme();
@@ -2003,6 +2035,8 @@ export default class FileView extends View {
       this.mdHeights = {
         blocks,
         sizes: blocks.map((b) => {
+          const code = fenceBody(b);
+          if (code) return code.rows.length * 19 + (code.tag ? 15 : 0) + 16 + 2 + 12;
           let lines = 0;
           for (const l of b.split("\n")) lines += Math.max(1, Math.ceil(l.length / 80));
           return lines * 24 + 24;
@@ -2029,9 +2063,10 @@ export default class FileView extends View {
                   .py(6)
                   .overflow_hidden()
                   .child(
-                    hits[i]
-                      ? renderMdMatchBlock(blocks[i], q, local, t)
-                      : TextView.markdown(`fv-md-${this.slotId}-s${i}`, blocks[i]),
+                    codeCard(blocks[i], t, hits[i] ? q : "", local) ??
+                      (hits[i]
+                        ? renderMdMatchBlock(blocks[i], q, local, t)
+                        : TextView.markdown(`fv-md-${this.slotId}-s${i}`, blocks[i])),
                   ),
               );
             }
