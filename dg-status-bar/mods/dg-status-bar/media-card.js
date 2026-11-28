@@ -25,8 +25,8 @@ export function mediaCard({ t, m, onHover, onMove, cmd, onDismiss }) {
   const pos = Math.min(m.lengthUs || Infinity, m.positionUs + (playing ? (Date.now() - m.syncedAt) * 1000 : 0));
   const frac = m.lengthUs > 0 ? Math.max(0, Math.min(1, pos / m.lengthUs)) : 0;
   const barW = 316;
-  // The image loader decodes by extension: Chromium's cover files (/tmp/.org.chromium.Chromium.xxxx) have none and draw as an empty 56px box.
-  const art = m.artUrl?.startsWith("file://") && /\.(png|jpe?g|webp|gif|bmp)$/i.test(m.artUrl) ? m.artUrl.slice(7) : null;
+  // artRel: extensionless covers (Brave) copied by the status bar into data/media-art/. Other extensionless files would draw an empty 56px box.
+  const art = m.artRel ?? (m.artUrl?.startsWith("file://") && /\.(png|jpe?g|webp|gif|bmp)$/i.test(m.artUrl) ? m.artUrl.slice(7) : null);
   const card = v_flex()
       .id("media-card")
       .w(340)
