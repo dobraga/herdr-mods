@@ -76,6 +76,8 @@ Eight are modified forks of Herdr's own mods (Apache-2.0, see [NOTICE](NOTICE)).
 | `dg-workspace-chrome` | The thin strip at the top of the Herdr sidebar and the Settings / Add machine footer at the bottom of it. |
 | `dg-status-bar` | A status bar along the bottom of the window (a chrome-colored strip with a top border). |
 
+The git diff view in `dg-file-view` (word highlight, split layout, hunk folding and hunk staging) is adapted from herdr-powertools (Apache-2.0); see [NOTICE](NOTICE).
+
 License: Apache-2.0.
 
 ## Keeping forks in sync

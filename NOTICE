@@ -14,3 +14,14 @@ Eight mods here are modified copies of mods shipped with herdr-app
 Each of these carries changes from the upstream version; see its RECIPE.md.
 The scheduling design of tools/tasks (the Tasks scheduler) is ported from
 herdr-automations (MIT), https://github.com/DnzzL/herdr-automations; see tools/tasks/NOTICE.md.
+
+dg-file-view's git diff view is partly adapted from herdr-powertools
+(https://github.com/stefanoginella/herdr-powertools, packages/git-diff, Apache License 2.0,
+Copyright 2026 Stefano Ginella). The diff modules dg-file-view/mods/dg-file-view/diff-model.js,
+diff-words.js and git-guard.js are ported from its diff.js, words and git-guard files, and the
+split, fold/expand and stage-hunk behaviour follows its main.js. Changes from upstream: hunkPatch
+refuses mode changes, modes other than 100644/100755, and cut, binary or conflicted diffs, so a
+patch only ever carries content edits; git-guard takes the expected checkout root in its expect
+object; words takes a per-file budget and markTokens merges word marks into syntax tokens;
+diff-layout.js (wrapping, unified and split layout, Auto) is written for this mod and is not from
+upstream. Each ported file carries its own header naming what changed.
