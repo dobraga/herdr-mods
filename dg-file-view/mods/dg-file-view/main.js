@@ -3,6 +3,9 @@ import { View, div, svg, list, image } from "gpui-kit";
 import { v_flex, h_flex, Editor, EditorState, TextView, Scrollbar, v_virtual_list, Input, InputState, SliderState, ScrollHandle, VirtualListScrollHandle } from "gpui-base";
 import { props, shared, setShared, spaces, panes, focused, run, exec, readTextFile, writeTextFile, watchFolder, theme, settings, home, checking, notify } from "herdr";
 import { colorRows, languageByTag, languageOf, tokenize } from "./syntax.js";
+import { parse, added, unified } from "./diff-model.js";
+import { words, markTokens, newBudget } from "./diff-words.js";
+import { layoutUnified, colsFor, DIFF_LINE_H } from "./diff-layout.js";
 import { inspectFile, launchApp, setDefaultApp, revealInFolder, visibleApps, renderOpenWithScreen } from "./open-with-ui.js";
 import {
   AUDIO_RATES,
@@ -35,9 +38,6 @@ const PDF_EXTS = new Set(["pdf"]);
 const UNSUPPORTED_ERR_RE = /utf-?8|invalid data|binary|too large|exceeds/i;
 const READ = ["--no-optional-locks", "-c", "core.fsmonitor=false", "-c", "diff.autoRefreshIndex=false"];
 const MAX_CHARS = 400000;
-const MAX_DIFF_LINE_CHARS = 1200;
-const countLines = (text) => (text ? text.split("\n").length - Number(text.endsWith("\n")) : 0);
-const untab = (text) => text.replace(/[^\t]*\t/g, (s) => s.slice(0, -1).padEnd((s.length - 1) - (s.length - 1) % 4 + 4));
 
 function joinPath(root, rel) {
   if (!root) return rel;
@@ -51,37 +51,18 @@ function shortRoot(root) {
   return root === h ? "~" : root.startsWith(h + "/") ? "~" + root.slice(h.length) : root;
 }
 
-function diffRows(lines) {
-  let old = 0, next = 0;
-  return lines.map((line) => {
-    const match = /^@@ -(\d+)(?:,\d+)? \+(\d+)/.exec(line);
-    if (match) { old = +match[1]; next = +match[2]; return { kind: "@", text: line }; }
-    const kind = line[0];
-    if (kind === "-") return { kind, number: old++, text: untab(line.slice(1)) || " " };
-    if (kind === "+") return { kind, number: next++, text: untab(line.slice(1)) || " " };
-    if (kind === " ") { old++; return { kind, number: next++, text: untab(line.slice(1)) || " " }; }
-    return { kind: "", text: line };
-  });
-}
-
-// Splits a diff row into display lines of at most `cols` characters (hard wrap, syntax tokens kept), so a long
-// line (Markdown prose especially) shows in full instead of running off the pane.
-const DIFF_LINE_H = 20;
-function wrapDiffRow(row, cols) {
-  const toks = row.tokens ?? [{ kind: "", text: row.text }];
-  const lines = [[]];
-  let used = 0;
-  for (const tok of toks) {
-    let rest = tok.text;
-    while (rest.length) {
-      if (used >= cols) { lines.push([]); used = 0; }
-      const part = rest.slice(0, cols - used);
-      lines[lines.length - 1].push({ kind: tok.kind, text: part });
-      used += part.length;
-      rest = rest.slice(part.length);
-    }
+// Colours (syntax tokens) and word marks for diff rows. Tokens live on the shared line objects, so each line is
+// tokenised once per build; word marks are computed once per line (line.marks) against its +/- pair, within the
+// per-file budget. row.tokens is what diff-layout wraps and the row renderer draws.
+function prepareDiffRows(rows, path, budget) {
+  colorRows(rows.map((row) => row.line ?? row), path);
+  for (const row of rows) {
+    const line = row.line;
+    if (!line) continue;
+    if (line.marks === undefined) line.marks = (row.kind === "+" || row.kind === "-") && row.pair ? words(line.text, row.pair.text, budget) : null;
+    row.tokens = markTokens(line.tokens, line.marks, line.text);
   }
-  return lines;
+  return rows;
 }
 
 // The preview's renderer has no <details>, footnotes or definition lists: turn them into plain Markdown it
@@ -404,6 +385,12 @@ export default class FileView extends View {
     this.diffVersion = 0;
     this.diffScroll = VirtualListScrollHandle.new();
     this.diffLayout = null;
+    this.diffDoc = null;
+    this.diffRaw = null;
+    this.diffKey = null;
+    this.diffPath = null;
+    this.diffExpanded = new Map();
+    this.diffBudget = null;
     this.error = null;
     this.loading = false;
     this.watched = null;
@@ -763,10 +750,33 @@ export default class FileView extends View {
     return this.mode ?? slot?.kind ?? "file";
   }
 
-  setLines(lines, path) {
-    this.rows = colorRows(diffRows(lines), path);
+  // Rebuilds the unified rows from the parsed diff. Bumping diffVersion changes the list id, so the virtual
+  // list never sees a sizes array of a different length.
+  buildDiffRows() {
+    this.rows = this.diffDoc ? prepareDiffRows(unified(this.diffDoc, this.diffExpanded), this.diffPath, this.diffBudget) : [];
     this.diffVersion = (this.diffVersion ?? 0) + 1;
     this.diffLayout = null;
+  }
+
+  clearDiff() {
+    this.diffDoc = null;
+    this.diffRaw = null;
+    this.diffKey = null;
+    this.diffExpanded = new Map();
+    this.buildDiffRows();
+  }
+
+  // doc: parsed diff (diff-model); raw: the text it came from (a reload with the same text is skipped);
+  // message: a single note row instead of a diff (binary, unreadable, ...).
+  setDiff(doc, raw, key, path, message = null) {
+    this.diffDoc = doc;
+    this.diffRaw = raw;
+    this.diffKey = key;
+    this.diffPath = path;
+    this.diffExpanded = new Map();
+    this.diffBudget = newBudget();
+    this.buildDiffRows();
+    if (message) this.rows = [{ kind: "", text: message }];
   }
 
   fetchOpenWithData(fullPath, seq, cx, { focusInput = false } = {}) {
@@ -946,7 +956,7 @@ export default class FileView extends View {
           this.code?.release();
           this.code = null;
           this.markdownText = null;
-          this.setLines([]);
+          this.clearDiff();
           this.mediaMode = null;
           this.mediaData = null;
           this.unsupported = null;
@@ -972,7 +982,7 @@ export default class FileView extends View {
           const top = await exec("git", ["rev-parse", "--show-toplevel"], { cwd: slot.root, on }).catch(() => null);
           if (seq !== this.loadSeq) return;
           if (!top || top.code !== 0) {
-            this.setLines([]);
+            this.clearDiff();
             this.error = "Not a git repository";
             return;
           }
@@ -986,41 +996,37 @@ export default class FileView extends View {
           const xy = entry.slice(0, 2);
           const fresh = xy === "??" || (head.code !== 0 && xy.includes("A"));
 
-          let lines;
+          const key = `${fullPath}\0${slot.stage ?? ""}\0${fresh}`;
+          let raw, doc = null, message = null;
           if (fresh) {
             const text = await readTextFile(fullPath, { on }).catch(() => null);
             if (seq !== this.loadSeq) return;
-            if (text === null) lines = ["Cannot preview this file (binary, too large, or unreadable)"];
-            else if (text.includes("\0")) lines = ["Binary file · no text diff"];
-            else {
-              const total = countLines(text);
-              lines = [`@@ -0,0 +1,${total} @@`, ...text.slice(0, MAX_CHARS).replace(/\n$/, "").split("\n").slice(0, 3000).map((l) => `+${l}`)];
-            }
+            raw = text ?? "";
+            if (text === null) message = "Cannot preview this file (binary, too large, or unreadable)";
+            else if (text.includes("\0")) message = "Binary file · no text diff";
+            else if (!text) message = "Empty file";
+            else doc = added(text.slice(0, MAX_CHARS));
           } else {
-            const r = await git(["diff", ...(slot.stage === "staged" ? ["--cached"] : slot.stage === "changes" ? [] : head.code === 0 ? ["HEAD"] : []), "--no-ext-diff", "--no-textconv", "--no-color", "--", relFromGit]);
+            const r = await git(["--literal-pathspecs", "diff", "--full-index", "--src-prefix=a/", "--dst-prefix=b/", "--no-renames", ...(slot.stage === "staged" ? ["--cached"] : slot.stage === "changes" ? [] : head.code === 0 ? ["HEAD"] : []), "--no-ext-diff", "--no-textconv", "--no-color", "--", relFromGit]);
             if (seq !== this.loadSeq) return;
             if (r.code !== 0) throw new Error(r.stderr || "git diff failed");
-            const all = r.stdout.replace(/\n$/, "").split("\n");
-            const first = all.findIndex((l) => l.startsWith("@@"));
-            if (first < 0) {
-              if (!entry) lines = [];
-              else lines = ["Binary file changed or no text diff available"];
-            } else {
-              lines = all.slice(first);
+            raw = r.stdout;
+            doc = parse(raw);
+            if (!doc.hunks.length) {
+              doc = null;
+              if (entry) message = "Binary file changed or no text diff available";
             }
           }
-          this.setLines(
-            lines
-              .slice(0, 3000)
-              .map((line) => (line.length > MAX_DIFF_LINE_CHARS ? line.slice(0, MAX_DIFF_LINE_CHARS) + "… (line truncated)" : line)),
-            relFromGit,
-          );
+          // Same diff as the one shown: keep the rows (and the scroll position) as they are.
+          if (key === this.diffKey && raw === this.diffRaw && this.rows.length) return;
+          if (doc || message) this.setDiff(doc, raw, key, relFromGit, message);
+          else this.clearDiff();
           if (this.rows.length === 0) this.error = "No uncommitted changes for this file";
           return;
         }
 
         // mode === "file"
-        this.setLines([]);
+        this.clearDiff();
         this.openWithQuery = "";
         this.openWithAt = 0;
         this.openWithNotice = null;
@@ -2278,15 +2284,28 @@ export default class FileView extends View {
     this.pdfPageSlider = null;
   }
 
-  diffRow(row, wrapped, t) {
-    const { kind, number, text } = row;
+  unifiedRow(row, wrapped, t) {
+    const { kind } = row;
+    if (kind === "gap") return h_flex().w_full().h(DIFF_LINE_H + 2).flex_none();
+    const number = kind === "-" ? row.old : kind === "+" || kind === " " ? row.next : undefined;
     const pct = Number(shared("files-tabs.settings")?.diffTint);
-    const alpha = Math.round(((Number.isFinite(pct) ? Math.min(30, Math.max(0, pct)) : 10) / 100) * 255).toString(16).padStart(2, "0");
+    const tint = Number.isFinite(pct) ? Math.min(30, Math.max(0, pct)) : 10;
+    const hex = (p) => Math.round((p / 100) * 255).toString(16).padStart(2, "0");
+    const alpha = hex(tint);
+    // Changed words get a stronger background than the row tint.
+    const markAlpha = hex(Math.min(60, 3 * tint));
+    const mark = kind === "+" ? t.ansi2 + markAlpha : t.ansi1 + markAlpha;
     const tone = { keyword: t.ansi5, string: t.ansi2, comment: t.dim, function: t.ansi4, type: t.ansi3, number: t.ansi6, constant: t.ansi6 };
     const body = v_flex().flex_1().min_w(0).children(
       wrapped.map((segs) =>
         h_flex().h(DIFF_LINE_H).flex_none().overflow_hidden().whitespace_nowrap().children(
-          segs.map((k) => div().flex_none().text_color(kind === "@" ? t.dim : tone[k.kind] ?? t.foreground).child(k.text)),
+          segs.map((k) =>
+            div()
+              .flex_none()
+              .text_color(kind === "@" ? t.dim : tone[k.kind] ?? t.foreground)
+              .when(k.marked && (kind === "+" || kind === "-"), (e) => e.bg(mark))
+              .child(k.text),
+          ),
         ),
       ),
     );
@@ -2305,13 +2324,14 @@ export default class FileView extends View {
       .child(body);
   }
 
-  // Wrapped lines and row heights for the pane's current width (monospace 12.5px ≈ 7.5px per character).
+  // Wrapped lines and row heights for the pane's current width (monospace 12.5px ≈ 7.6px per character).
+  // The cache key is (cols, rows, layout); every recompute bumps diffVersion, which is part of the list id.
   diffLayoutFor(cx) {
     const width = this.diffScroll?.viewport_size()?.width ?? 0;
-    const cols = width > 0 ? Math.max(20, Math.floor((width - 92) / 7.6)) : 100;
-    if (this.diffLayout?.cols !== cols || this.diffLayout.rows !== this.rows) {
-      const wrapped = this.rows.map((row) => wrapDiffRow(row, row.kind === "@" ? cols + 8 : cols));
-      this.diffLayout = { cols, rows: this.rows, wrapped, sizes: wrapped.map((w) => w.length * DIFF_LINE_H + 2) };
+    const layout = "unified";
+    const cols = colsFor(width, layout);
+    if (this.diffLayout?.cols !== cols || this.diffLayout.rows !== this.rows || this.diffLayout.layout !== layout) {
+      this.diffLayout = { cols, layout, rows: this.rows, ...layoutUnified(this.rows, cols) };
       this.diffVersion = (this.diffVersion ?? 0) + 1;
     }
     if (width === 0 && !this.diffMeasure) {
@@ -2341,7 +2361,7 @@ export default class FileView extends View {
       this.targetKey = nextKey;
       this.mode = null;
       this.mdPreview = null;
-      this.setLines([]);
+      this.clearDiff();
       this.code?.release();
       this.code = null;
       this.markdownText = null;
@@ -2859,7 +2879,7 @@ export default class FileView extends View {
                       (i) => `${this.diffVersion}-${i}`,
                       (range) => {
                         const out = [];
-                        for (let i = range.start; i < range.end; i++) out.push(this.diffRow(this.rows[i], lay.wrapped[i], t));
+                        for (let i = range.start; i < range.end; i++) out.push(this.unifiedRow(this.rows[i], lay.wrapped[i], t));
                         return out;
                       },
                     )
