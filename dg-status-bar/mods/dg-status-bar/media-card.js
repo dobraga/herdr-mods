@@ -16,7 +16,7 @@ function ctl(id, icon, on, t, size = 16) {
     .hover((s) => s.bg(t.hover))
     .on_mouse_down("left", (_e, cx) => cx.stop_propagation())
     .on_click(() => on())
-    .child(svg(`mods/media-card/icons/${icon}.svg`).size(size).flex_none().text_color(t.foreground));
+    .child(svg(`mods/dg-status-bar/icons/media-${icon}.svg`).size(size).flex_none().text_color(t.foreground));
 }
 
 // Pure element builder for the media card; rendered as the content of an anchored Popup.
@@ -41,7 +41,7 @@ export function mediaCard({ t, m, onHover, onMove, cmd, onDismiss }) {
           .p(12)
           .gap(10)
           .items_center()
-          .child(art ? image(art).size(56).rounded(6) : svg(`mods/media-card/icons/${m.brand}.svg`).size(40).text_color(t.muted))
+          .child(art ? image(art).size(56).rounded(6) : svg(`mods/dg-status-bar/icons/media-${m.brand}.svg`).size(40).text_color(t.muted))
           .child(
             v_flex()
               .flex_1()

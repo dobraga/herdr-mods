@@ -389,7 +389,7 @@ export default class WorkspaceStatusUsage extends View {
           cx.stop_propagation();
           on();
         })
-        .child(svg(`mods/media-card/icons/${icon}.svg`).size(12).flex_none().text_color(t.foreground));
+        .child(svg(`mods/dg-status-bar/icons/media-${icon}.svg`).size(12).flex_none().text_color(t.foreground));
     const isOpen = Boolean(shared("media.open"));
     const trigger = h_flex()
       .id("status-media")
