@@ -33,6 +33,7 @@ Each mod is a top-level folder with a `README.md` (everything it does), a `RECIP
 | [`dg-workbench-layout`](dg-workbench-layout/README.md) | The layout that puts them all together |
 
 Eight are modified forks of Herdr's own mods (Apache-2.0, see [NOTICE](NOTICE)). Mods work together through shared state; each recipe lists what it assumes.
+The diff view in `dg-file-view` is adapted from [herdr-powertools](https://github.com/stefanoginella/herdr-powertools) (Apache-2.0, see [NOTICE](NOTICE)).
 
 ## The tour
 

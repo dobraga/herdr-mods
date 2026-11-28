@@ -34,7 +34,7 @@ This links the mod into `~/.config/herdr-app/mods`; `git pull` updates it. The f
 - **Code files**: edit in place. `Ctrl/Cmd+S` saves; a dot in the header marks unsaved edits. If the file changed on disk you get "File changed on disk" with Overwrite and Reload.
 - **Find**: `Ctrl/Cmd+F` in code, Markdown and PDF; `F3` / `Shift+F3` step through matches, `Esc` closes.
 - **Markdown and SVG**: open as Preview; the Code chip shows the source.
-- **Diff**: shows `git diff HEAD` for one file, with Diff / File chips to switch. Tint strength comes from the `diffTint` setting written by `dg-settings`.
+- **Diff**: shows `git diff HEAD` for one file, with Diff / File chips to switch. Changed words are highlighted on top of the line tint. Unified, Split and Auto chips (or `s`) pick the layout; Auto splits side by side when both sides fit and the file is not new, deleted or untracked. The choice is remembered. Unchanged lines between hunks are folded: click "Show N of M unchanged lines" to reveal 80 more (640 at most), or "Hide". `w` (or Whole file) shows the whole file. In the Changes and Staged tabs, click a hunk's header to Stage or Unstage it. That is not offered in the combined view or in whole-file mode, and it refuses during a rebase or merge or if the file changed since it was shown. On a remote checkout the other stage tab stays stale until you reload it. Diff code adapted from [herdr-powertools](https://github.com/stefanoginella/herdr-powertools) (Apache-2.0). Tint strength comes from the `diffTint` setting written by `dg-settings`.
 - **Images**: Fit, 100%, zoom, Reveal in Files, Copy path.
 - **Audio**: waveform, seek, speed, volume. `Space` plays/pauses, Left/Right seek 5 s.
 - **Video**: poster frame and 8-thumbnail storyboard (no playback, no sound).
@@ -50,7 +50,7 @@ This links the mod into `~/.config/herdr-app/mods`; `git pull` updates it. The f
 - Poppler (`pdfinfo`, `pdftoppm`, `pdftotext`) for PDFs; without it they fall back to Open with.
 - `gio` / `xdg-open` / `gtk-launch` (Linux desktop) to launch and reveal files.
 - Icons come from the shipped `changes`, `files` and `workspace-chrome` mods; they are blank if missing.
-- Reads any file a caller points it to, and writes only the file you edit. Preview images are cached under the app's `data/file-view-cache/` (pruned to 90 files / 80 MB).
+- Reads any file a caller points it to, and writes only the file you edit (plus the git index, when you stage or unstage a hunk). Preview images are cached under the app's `data/file-view-cache/` (pruned to 90 files / 80 MB).
 - No network access beyond a token-guarded audio helper on `127.0.0.1`, which quits when the view closes or after 10 idle minutes.
 
 See [RECIPE.md](RECIPE.md) for how it is built.
