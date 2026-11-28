@@ -38,6 +38,11 @@ const PDF_EXTS = new Set(["pdf"]);
 const UNSUPPORTED_ERR_RE = /utf-?8|invalid data|binary|too large|exceeds/i;
 const READ = ["--no-optional-locks", "-c", "core.fsmonitor=false", "-c", "diff.autoRefreshIndex=false"];
 const MAX_CHARS = 400000;
+// Fold/expand of the unchanged lines between hunks: read from the old blob (args: blob, first, last).
+const GAP_LINES = 80, EXPANDED_LINES = 640;
+const READ_CONTEXT = `git cat-file blob "$1" | LC_ALL=C awk -v first="$2" -v last="$3" 'NR >= first {print substr($0, 1, 8004)} NR == last {exit}'`;
+// Line count of the new side when it is the index (a staged diff): args: path.
+const COUNT_INDEX = `git cat-file blob ":$1" | awk 'END {print NR}'`;
 
 function joinPath(root, rel) {
   if (!root) return rel;
@@ -457,6 +462,10 @@ export default class FileView extends View {
     this.diffWidest = 0;
     this.diffRowsLayout = "unified"; // layout this.rows were built for
     this.diffWidth = 0; // last measured viewport width (0 until measured)
+    this.diffWhole = false; // `w`: the whole file as one diff (-U100000): no gaps, no staging
+    this.diffRepo = null; // {root, on} of the checkout the shown diff came from (expand reads blobs there)
+    this.gapBusy = null; // {doc, hunk} while unchanged lines are being read
+    this.diffNotice = null; // error strip under the diff (dismiss by clicking it)
     this.error = null;
     this.loading = false;
     this.watched = null;
@@ -845,6 +854,7 @@ export default class FileView extends View {
     this.diffMessage = null;
     this.diffWidest = 0;
     this.diffExpanded = new Map();
+    this.diffNotice = null;
     this.buildDiffRows();
   }
 
@@ -858,6 +868,7 @@ export default class FileView extends View {
     this.diffMessage = message;
     this.diffWidest = doc ? widest(doc) : 0;
     this.diffExpanded = new Map();
+    this.diffNotice = null;
     this.diffBudget = newBudget();
     this.buildDiffRows();
   }
@@ -1079,7 +1090,7 @@ export default class FileView extends View {
           const xy = entry.slice(0, 2);
           const fresh = xy === "??" || (head.code !== 0 && xy.includes("A"));
 
-          const key = `${fullPath}\0${slot.stage ?? ""}\0${fresh}`;
+          const key = `${fullPath}\0${slot.stage ?? ""}\0${fresh}\0${this.diffWhole}`;
           let raw, doc = null, message = null;
           if (fresh) {
             const text = await readTextFile(fullPath, { on }).catch(() => null);
@@ -1090,7 +1101,7 @@ export default class FileView extends View {
             else if (!text) message = "Empty file";
             else doc = added(text.slice(0, MAX_CHARS));
           } else {
-            const r = await git(["--literal-pathspecs", "diff", "--full-index", "--src-prefix=a/", "--dst-prefix=b/", "--no-renames", ...(slot.stage === "staged" ? ["--cached"] : slot.stage === "changes" ? [] : head.code === 0 ? ["HEAD"] : []), "--no-ext-diff", "--no-textconv", "--no-color", "--", relFromGit]);
+            const r = await git(["--literal-pathspecs", "diff", "--full-index", "--src-prefix=a/", "--dst-prefix=b/", "--no-renames", ...(this.diffWhole ? ["-U100000"] : []), ...(slot.stage === "staged" ? ["--cached"] : slot.stage === "changes" ? [] : head.code === 0 ? ["HEAD"] : []), "--no-ext-diff", "--no-textconv", "--no-color", "--", relFromGit]);
             if (seq !== this.loadSeq) return;
             if (r.code !== 0) throw new Error(r.stderr || "git diff failed");
             raw = r.stdout;
@@ -1102,6 +1113,18 @@ export default class FileView extends View {
           }
           // Same diff as the one shown: keep the rows (and the scroll position) as they are.
           if (key === this.diffKey && raw === this.diffRaw && this.rows.length) return;
+          // Length of the new file, so the gap after the last hunk can be offered (not for whole-file mode, a
+          // cut diff, or a file with no old blob to read the lines from). Skipped when it cannot be read.
+          if (doc && !this.diffWhole && !fresh && doc.oldBlob && !doc.cut && !doc.newFile && !doc.deletedFile) {
+            const n = await (slot.stage === "staged"
+              ? exec("sh", ["-c", COUNT_INDEX, "dg-file-view", relFromGit], { cwd: gitRoot, on })
+              : exec("awk", ["END {print NR}", fullPath], { cwd: gitRoot, on })
+            ).catch(() => null);
+            if (seq !== this.loadSeq) return;
+            const total = n && n.code === 0 ? Number(n.stdout.trim()) : NaN;
+            if (Number.isInteger(total) && total > 0) doc.total = total;
+          }
+          this.diffRepo = { root: gitRoot, on };
           if (doc || message) this.setDiff(doc, raw, key, relFromGit, message);
           else this.clearDiff();
           if (this.rows.length === 0) this.error = "No uncommitted changes for this file";
@@ -2367,9 +2390,84 @@ export default class FileView extends View {
     this.pdfPageSlider = null;
   }
 
+  // One handler for the whole list (gpui-kit throws on on_click inside a virtual-list renderer). The key is
+  // `${diffVersion}-${i}`; a key from an older build (version differs) is ignored.
+  onDiffItem(key, cx) {
+    const dash = String(key).indexOf("-");
+    if (dash < 0 || Number(String(key).slice(0, dash)) !== this.diffVersion) return;
+    const row = this.rows[Number(String(key).slice(dash + 1))];
+    if (row?.kind === "gap") this.expandGap(row, cx);
+    // T8: else if (row?.kind === "@") this.stageHunk(row.hunk, cx);
+  }
+
+  // Shows 80 more unchanged lines of a gap (read from the old blob, from the gap's start on, 640 at most per
+  // gap), or hides them all again. Offered only when the diff has an old blob (not for new/untracked files).
+  expandGap(row, cx) {
+    const doc = this.diffDoc;
+    if (!doc || !doc.oldBlob || !this.diffRepo || this.gapBusy) return;
+    this.diffNotice = null;
+    const rebuild = () => {
+      this.buildDiffRows();
+      const at = this.rows.findIndex((r) => r.kind === "gap" && r.hunk === row.hunk);
+      try { if (at >= 0) this.diffScroll?.scroll_to_item(at); } catch {}
+      cx.notify();
+    };
+    if (row.action === "hide") { this.diffExpanded.delete(row.hunk); rebuild(); return; }
+    const shown = this.diffExpanded.get(row.hunk) ?? [];
+    const count = Math.min(row.count - shown.length, GAP_LINES, EXPANDED_LINES - shown.length);
+    if (count <= 0) return;
+    const first = row.old + shown.length, last = first + count - 1, repo = this.diffRepo;
+    this.gapBusy = { doc, hunk: row.hunk };
+    cx.spawn(async (cx) => {
+      try {
+        const r = await exec("sh", ["-c", READ_CONTEXT, "dg-file-view", doc.oldBlob, String(first), String(last)], { cwd: repo.root, on: repo.on });
+        const lines = r.stdout.replace(/\n$/, "").split("\n");
+        if (r.code !== 0 || lines.length !== count) throw new Error("Could not read the unchanged lines from git");
+        if (this.diffDoc !== doc) return;
+        this.diffExpanded.set(row.hunk, [...shown, ...lines.map((l) => l.replace(/\r$/, ""))]);
+        rebuild();
+      } catch (e) {
+        if (this.diffDoc === doc) this.diffNotice = String(e?.message ?? e);
+      } finally {
+        this.gapBusy = null;
+        cx.notify();
+      }
+    });
+  }
+
+  // `w` / "Whole file": reruns the diff with -U100000 (no gaps, and later no staging). Again goes back.
+  toggleDiffWhole(cx) {
+    const slot = this.slot();
+    if (!slot) return false;
+    this.diffWhole = !this.diffWhole;
+    this.load(slot, cx);
+    cx.notify();
+    return true;
+  }
+
   unifiedRow(row, wrapped, t, pal) {
     const { kind } = row;
-    if (kind === "gap") return h_flex().w_full().h(DIFF_LINE_H + 2).flex_none();
+    if (kind === "gap") {
+      const hide = row.action === "hide", left = row.count - row.showing;
+      const count = hide ? row.showing : Math.min(left, GAP_LINES, EXPANDED_LINES - row.showing);
+      const act = Boolean(this.diffDoc?.oldBlob);
+      const text = !hide && count <= 0
+        ? `${row.showing} unchanged lines shown (limit)`
+        : `${hide ? "Hide" : "Show"} ${count}${!hide && count < row.count ? ` of ${row.count}` : ""} unchanged line${count === 1 ? "" : "s"}`;
+      return h_flex()
+        .w_full()
+        .h(DIFF_LINE_H + 2)
+        .flex_none()
+        .px(14)
+        .gap(6)
+        .items_center()
+        .bg(t.raised)
+        .text_size(11)
+        .text_color(act && (hide || count > 0) ? t.accent : t.dim)
+        .when(act && (hide || count > 0), (e) => e.cursor_pointer())
+        .child(div().flex_none().child(hide ? "▴" : "▾"))
+        .child(div().min_w(0).child(text));
+    }
     const number = kind === "-" ? row.old : kind === "+" || kind === " " ? row.next : undefined;
     const body = diffLines(wrapped, kind, t, pal);
     if (kind === "@") return h_flex().w_full().px(14).py(1).flex_none().bg(t.raised).child(body);
@@ -2541,6 +2639,18 @@ export default class FileView extends View {
           !e.modifiers?.shift
         ) {
           if (this.toggleDiffLayout(cx)) cx.stop_propagation();
+          return;
+        }
+        if (
+          k === "w" &&
+          mode === "diff" &&
+          !showingOpenWith &&
+          !e.modifiers?.control &&
+          !e.modifiers?.platform &&
+          !e.modifiers?.alt &&
+          !e.modifiers?.shift
+        ) {
+          if (this.toggleDiffWhole(cx)) cx.stop_propagation();
           return;
         }
         if (mode === "file" && !showingOpenWith && !this.mediaMode && this.code) {
@@ -2739,6 +2849,18 @@ export default class FileView extends View {
                     }),
                   ),
                 ),
+            ),
+          )
+          .when(mode === "diff" && !showingOpenWith, (el) =>
+            el.child(
+              h_flex()
+                .gap(2)
+                .p(2)
+                .rounded(6)
+                .bg(t.background)
+                .border(1)
+                .border_color(t.border)
+                .child(chip("fv-diff-whole", "Whole file", this.diffWhole, (_e, cx) => this.toggleDiffWhole(cx))),
             ),
           )
           .when(isMd, (el) =>
@@ -3019,10 +3141,32 @@ export default class FileView extends View {
                       },
                     )
                       .track_scroll(this.diffScroll)
+                      .on_item_click((key, cx) => this.onDiffItem(key, cx))
                       .size_full();
                   })(),
                 )
                 .child(Scrollbar.vertical(`fv-diff-${this.slotId}-${this.diffVersion}`).viewport_from_layout().absolute().inset_0())
+                .when(Boolean(this.diffNotice), (e) =>
+                  e.child(
+                    div()
+                      .id(`fv-diff-notice-${this.slotId}`)
+                      .absolute()
+                      .bottom(8)
+                      .left(12)
+                      .right(12)
+                      .px(10)
+                      .py(4)
+                      .rounded(6)
+                      .bg(t.raised)
+                      .border(1)
+                      .border_color(t.ansi1)
+                      .text_size(11)
+                      .text_color(t.foreground)
+                      .cursor_pointer()
+                      .on_click((_e, cx) => { this.diffNotice = null; cx.notify(); })
+                      .child(`${this.diffNotice} (click to dismiss)`),
+                  ),
+                )
                 .when(this.loading && this.rows.length === 0, (e) => e.child(div().p(16).text_color(t.dim).child("Loading diff…"))),
         ),
       );
