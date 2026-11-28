@@ -47,6 +47,8 @@ const COUNT_INDEX = `git cat-file blob ":$1" | awk 'END {print NR}'`;
 // Checkouts (keyed by on + root) with a hunk being staged or unstaged: one apply at a time per checkout.
 const staging = new Set();
 
+const dirname = (p) => p.replace(/\/[^/]*$/, "") || "/";
+
 function joinPath(root, rel) {
   if (!root) return rel;
   const sep = root.includes("\\") && !root.includes("/") ? "\\" : "/";
@@ -197,6 +199,18 @@ function splitMdBlocks(text) {
 const mermaidCode = (b) => {
   const m = /^\s*(```|~~~)mermaid[^\n]*\n([\s\S]*?)\n\s*\1\s*$/.exec(b);
   return m ? m[2] : null;
+};
+
+// A block made only of local `![alt](src)` lines (the Markdown view draws no images itself): their srcs, else null.
+const mdImageSrcs = (b) => {
+  const lines = b.split("\n").map((l) => l.trim()).filter(Boolean);
+  const out = [];
+  for (const l of lines) {
+    const m = /^!\[[^\]]*\]\(\s*<?([^)\s>]+)>?(?:\s+"[^"]*")?\s*\)$/.exec(l);
+    if (!m || /^[a-z][a-z0-9+.-]*:/i.test(m[1])) return null;
+    out.push(decodeURI(m[1]));
+  }
+  return out.length ? out : null;
 };
 
 const isFencedBlock = (b) => /^\s*(```|~~~)/.test(b);
@@ -2137,7 +2151,40 @@ export default class FileView extends View {
 
   // A ```mermaid block draws as a rendered PNG (mmdr, cached by hash); until it is ready, or if it
   // fails, the block stays as code with the error underneath.
+  // Local images in a Markdown file: loaded through the image helper (cached), drawn fit to 900px wide.
+  renderMdImages(srcs, cx) {
+    const slot = this.slot();
+    const dir = dirname(joinPath(slot.root, slot.path));
+    if (!this.mdImgCache) this.mdImgCache = new Map();
+    const t = theme();
+    return v_flex().gap(8).children(
+      srcs.map((src) => {
+        const full = src.startsWith("/") ? src : joinPath(dir, src);
+        let entry = this.mdImgCache.get(full);
+        if (!entry) {
+          entry = { state: "loading" };
+          this.mdImgCache.set(full, entry);
+          cx.spawn(async (cx) => {
+            try {
+              Object.assign(entry, { state: "ok", ...(await loadImagePreview(full)) });
+            } catch (e) {
+              Object.assign(entry, { state: "error", error: String(e?.message || e) });
+            }
+            cx.notify();
+          });
+        }
+        if (entry.state === "ok") {
+          const k = Math.min(1, 900 / Math.max(1, entry.width), 600 / Math.max(1, entry.height));
+          return image(entry.relPath).w(Math.round(entry.width * k)).h(Math.round(entry.height * k));
+        }
+        return div().text_size(12).text_color(t.dim).child(entry.state === "loading" ? `Loading ${src}…` : `${src}: ${entry.error}`);
+      }),
+    );
+  }
+
   renderMdBlock(block, i, cx) {
+    const imgs = mdImageSrcs(block);
+    if (imgs) return this.renderMdImages(imgs, cx);
     const code = mermaidCode(block);
     if (code === null) {
       const t = theme();

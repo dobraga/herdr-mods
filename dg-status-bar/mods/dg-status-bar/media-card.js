@@ -16,7 +16,7 @@ function ctl(id, icon, on, t, size = 16) {
     .hover((s) => s.bg(t.hover))
     .on_mouse_down("left", (_e, cx) => cx.stop_propagation())
     .on_click(() => on())
-    .child(svg(`mods/media-card/icons/${icon}.svg`).size(size).flex_none().text_color(t.foreground));
+    .child(svg(`mods/dg-status-bar/icons/media-${icon}.svg`).size(size).flex_none().text_color(t.foreground));
 }
 
 // Pure element builder for the media card; rendered as the content of an anchored Popup.
@@ -25,10 +25,12 @@ export function mediaCard({ t, m, onHover, onMove, cmd, onDismiss }) {
   const pos = Math.min(m.lengthUs || Infinity, m.positionUs + (playing ? (Date.now() - m.syncedAt) * 1000 : 0));
   const frac = m.lengthUs > 0 ? Math.max(0, Math.min(1, pos / m.lengthUs)) : 0;
   const barW = 316;
-  const art = m.artUrl?.startsWith("file://") ? m.artUrl.slice(7) : null;
+  // artRel: extensionless covers (Brave) copied by the status bar into data/media-art/. Other extensionless files would draw an empty 56px box.
+  const art = m.artRel ?? (m.artUrl?.startsWith("file://") && /\.(png|jpe?g|webp|gif|bmp)$/i.test(m.artUrl) ? m.artUrl.slice(7) : null);
   const card = v_flex()
       .id("media-card")
       .w(340)
+      .overflow_hidden()
       .rounded(10)
       .bg(t.popover)
       .border_1()
@@ -41,10 +43,11 @@ export function mediaCard({ t, m, onHover, onMove, cmd, onDismiss }) {
           .p(12)
           .gap(10)
           .items_center()
-          .child(art ? image(art).size(56).rounded(6) : svg(`mods/media-card/icons/${m.brand}.svg`).size(40).text_color(t.muted))
+          .child(art ? image(art).size(56).rounded(6) : svg(`mods/dg-status-bar/icons/media-${m.brand}.svg`).size(40).text_color(t.muted))
           .child(
             v_flex()
               .flex_1()
+              .min_w(0)
               .gap(2)
               .child(div().font_semibold().text_size(13).truncate().child(m.title || "Unknown"))
               .child(div().text_color(t.muted).truncate().child(m.artist || m.album || m.bus.split(".").pop())),

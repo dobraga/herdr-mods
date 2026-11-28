@@ -341,12 +341,34 @@ export default class WorkspaceStatusUsage extends View {
     }
   }
 
+  // The image loader decodes by extension, but Chromium/Brave cover files (/tmp/.org.chromium.Chromium.xxxx) have none: copy the file into
+  // data/media-art/ with the extension its content says, and hand the card that app-home-relative path. One file is kept (the current cover).
+  async cacheArt(artUrl) {
+    if (!artUrl?.startsWith("file://") || /\.(png|jpe?g|webp|gif|bmp)$/i.test(artUrl)) return null;
+    if (this.artSrc === artUrl) return this.artRel ?? null;
+    this.artSrc = artUrl;
+    this.artRel = null;
+    try {
+      const src = decodeURIComponent(artUrl.slice(7));
+      const mime = ((await exec("file", ["-b", "--mime-type", src])).stdout || "").trim();
+      const ext = { "image/png": "png", "image/jpeg": "jpg", "image/webp": "webp", "image/gif": "gif" }[mime];
+      if (!ext) return null;
+      const name = `${src.split("/").pop().replace(/[^A-Za-z0-9_-]/g, "")}.${ext}`;
+      const dir = `${appHome()}/data/media-art`;
+      await exec("mkdir", ["-p", dir]);
+      await exec("find", [dir, "-type", "f", "!", "-name", name, "-delete"]);
+      if ((await exec("cp", ["-f", src, `${dir}/${name}`])).code === 0) this.artRel = `data/media-art/${name}`;
+    } catch {}
+    return this.artRel;
+  }
+
   async pollMedia(cx) {
     if (this.mediaBusy) return;
     this.mediaBusy = true;
     try {
       const players = await readPlayers(exec);
       const active = pickActive(players);
+      if (active) active.artRel = await this.cacheArt(active.artUrl);
       const state = active ? { ...active, players: players.map((p) => ({ bus: p.bus, title: p.title, status: p.status })), syncedAt: Date.now() } : null;
       const sig = signature(state);
       if (sig !== this.mediaSig) {
@@ -389,7 +411,7 @@ export default class WorkspaceStatusUsage extends View {
           cx.stop_propagation();
           on();
         })
-        .child(svg(`mods/media-card/icons/${icon}.svg`).size(12).flex_none().text_color(t.foreground));
+        .child(svg(`mods/dg-status-bar/icons/media-${icon}.svg`).size(12).flex_none().text_color(t.foreground));
     const isOpen = Boolean(shared("media.open"));
     const trigger = h_flex()
       .id("status-media")

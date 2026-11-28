@@ -1,26 +1,96 @@
 # herdr-mods
 
-Mods for [Herdr](https://herdr.dev), each in its own folder with a `RECIPE.md` (a brief an agent can rebuild it from) and a `preview.png`.
+Keep your projects, agents, files, Git changes and pull requests in one [Herdr](https://herdr.dev) window. Install the whole workbench or pick the mods you need.
 
-## Layout
+![The dg-workbench-layout: spaces in folders, agents by urgency, a tab bar with tool panels and a status bar](dg-workbench-layout/preview.png)
 
-Gallery layout (herdr.dev/mods): every mod is a top-level folder with its files in `mods/<name>/`, plus `RECIPE.md` and `preview.png`.
-A mod's tests live in its own folder (`<name>/tests/`). `tools/` (the Tasks scheduler, preview tooling) and `install.sh` are not mods.
+**What you get.** A sidebar of spaces grouped in folders, every running agent ranked by urgency, a tab bar with Files, Changes, PRs, Loadout, Tasks and Inbox panels, a file viewer and editor, and a status bar with branch, PR and CI state.
 
-```
-inbox/
-  mods/dg-inbox/      main.js, mod.json, ...
-  tests/           the mod's tests
-  RECIPE.md
-  preview.png
-tools/tasks/       herdr-tasks, the scheduler the `dg-tasks` mod needs
-```
+[Install](#install) · [The layout](#the-layout) · [Mods](#whats-here) · [Tour](#the-tour) · [Development](#development)
+
+## What's here
+
+Each mod is a top-level folder with a `README.md` (everything it does), a `RECIPE.md` (a brief an agent can rebuild it from) and a `preview.png`.
+
+| Mod | In short |
+|---|---|
+| [`dg-spaces`](dg-spaces/README.md) | The sidebar's spaces, rebuilt around folders and profiles |
+| [`dg-agents`](dg-agents/README.md) | Every running agent, grouped by space or sorted by urgency |
+| [`dg-inbox`](dg-inbox/README.md) | One ranked list of what needs you: blocked agents, PR alerts, task runs, ask cards |
+| [`dg-files`](dg-files/README.md) | The working folder as a lazy file tree |
+| [`dg-file-view`](dg-file-view/README.md) | One tab per file: code editor, Markdown, image, audio, video, PDF, git diff |
+| [`dg-file-picker`](dg-file-picker/README.md) | Ctrl+P popup to find a file in the active space |
+| [`dg-changes`](dg-changes/README.md) | Git changes of the active space, staged apart from unstaged |
+| [`dg-prs`](dg-prs/README.md) | Your open GitHub and Bitbucket Cloud pull requests across profiles |
+| [`dg-loadout`](dg-loadout/README.md) | Skills, MCP servers and plugins configured for the folder (Claude, Antigravity, Codex, Gemini) |
+| [`dg-tasks`](dg-tasks/README.md) | Scripts and scheduled tasks for the folder (needs the scheduler) |
+| [`dg-tabs`](dg-tabs/README.md) | The top tab bar |
+| [`dg-new-tab`](dg-new-tab/README.md) · [`dg-new-menu`](dg-new-menu/README.md) | The new-tab dialog and the "+" menu |
+| [`dg-status-bar`](dg-status-bar/README.md) | Bottom bar: branch, PR and CI, agents, usage, load |
+| [`dg-workspace-chrome`](dg-workspace-chrome/README.md) | The strip at the top of the sidebar and its Settings footer |
+| [`dg-settings`](dg-settings/README.md) | A modal Settings with a left nav, replacing the native one |
+| [`dg-desktop-toast`](dg-desktop-toast/README.md) | A replacement for Herdr's notification toast |
+| [`dg-workbench-layout`](dg-workbench-layout/README.md) | The layout that puts them all together |
+
+Eight are modified forks of Herdr's own mods (Apache-2.0, see [NOTICE](NOTICE)). Mods work together through shared state; each recipe lists what it assumes.
+The diff view in `dg-file-view` is adapted from [herdr-powertools](https://github.com/stefanoginella/herdr-powertools) (Apache-2.0, see [NOTICE](NOTICE)).
+
+## The tour
+
+### Spaces and agents
+
+**Projects in folders.** `dg-spaces` groups spaces in colored folders and profiles; `dg-agents` lists every running agent under it, by urgency (Needs you, Done, Working, Idle).
+
+![dg-spaces](dg-spaces/preview.png)
+![dg-agents](dg-agents/preview.png)
+
+### Inbox
+
+**One list of what needs you.** Blocked or finished agents, PR alerts and task runs, with ask cards to answer a waiting agent from the list. [More](dg-inbox/README.md)
+
+![dg-inbox](dg-inbox/preview.png)
+
+### Files and the file viewer
+
+**Browse, find, open.** `dg-files` is the lazy tree, `dg-file-picker` finds a file with Ctrl+P, and `dg-file-view` opens it the right way: editor, Markdown, image, audio, video, PDF or git diff.
+
+![dg-files](dg-files/preview.png)
+![dg-file-picker](dg-file-picker/preview.png)
+![dg-file-view](dg-file-view/preview.png)
+
+### Git and pull requests
+
+**Changes and PRs of the folder.** `dg-changes` separates staged from unstaged, and `dg-prs` lists GitHub and Bitbucket Cloud pull requests across profiles.
+
+![dg-changes](dg-changes/preview.png)
+![dg-prs](dg-prs/preview.png)
+
+### Loadout and tasks
+
+**What your AI setup has, and what runs on a schedule.** `dg-loadout` inventories skills, MCP servers and plugins; `dg-tasks` runs scripts and scheduled tasks.
+
+![dg-loadout](dg-loadout/preview.png)
+![dg-tasks](dg-tasks/preview.png)
+
+### Window chrome
+
+**Tabs, status bar, menus and toasts.**
+
+![dg-tabs](dg-tabs/preview.png)
+![dg-status-bar](dg-status-bar/preview.png)
+![dg-new-tab](dg-new-tab/preview.png)
+![dg-new-menu](dg-new-menu/preview.png)
+![dg-workspace-chrome](dg-workspace-chrome/preview.png)
+![dg-settings](dg-settings/preview.png)
+![dg-desktop-toast](dg-desktop-toast/preview.png)
+
+*Every picture comes from the demo workspace (see [Previews without real data](#previews-without-real-data)): fictional projects, agents and PRs.*
 
 ## Install
 
-Ask your Herdr agent to add `herdr.dev/mods/dobraga/herdr-mods--<name>`: it reads the recipe and every file first, and tells you if a mod reaches the network or runs programs.
+Ask your Herdr agent to add `herdr.dev/mods/dobraga/herdr-mods--<name>`. It reads the recipe and every file first, and tells you if a mod reaches the network or runs programs.
 
-Or clone the repo and link the mods yourself:
+Or clone the repo and link the mods:
 
 ```sh
 git clone https://github.com/dobraga/herdr-mods.git ~/src/herdr-mods
@@ -28,64 +98,44 @@ cd ~/src/herdr-mods
 ./install.sh                 # every mod, plus the Tasks scheduler (needs bun)
 ./install.sh dg-inbox dg-prs # only some mods
 ./install.sh --no-tasks      # every mod, without the scheduler
+./install.sh --setup         # also the layout and, if you have none, its keys.json
 ./install.sh --uninstall     # remove the links and the scheduler service
 ```
 
-Mods (`<name>/mods/<name>/`) are symlinked into `~/.config/herdr-app/mods/`, so `git pull` updates them. An existing real folder with the same name is moved to `~/.config/herdr-app/.backups/mods/`.
+Mods (`<name>/mods/<name>/`) are symlinked into `~/.config/herdr-app/mods/`, so `git pull` updates them. A real folder with the same name is moved to `~/.config/herdr-app/.backups/mods/`.
 
-### The layout (`dg-workbench-layout/`)
+### The layout
 
-The mods are built for our layout, [dg-workbench-layout](dg-workbench-layout/README.md): folders in the sidebar, a tab bar with the Files, Changes, PRs, Loadout, Tasks and Inbox panels, and a status bar.
+The mods are built for [dg-workbench-layout](dg-workbench-layout/README.md). After `./install.sh --setup`, pick `dg-workbench-layout` in Settings > Look. If you already have a `keys.json`, merge `dg-workbench-layout/keys.json` into it by hand. `setup/` and `tools/sync-layout.sh` keep that folder in step with the dotfiles repo, which owns the layout.
 
-```sh
-./install.sh --setup    # also links the layout and, if you have none, its keys.json
-```
+### The Tasks scheduler
 
-Then pick `dg-workbench-layout` in Settings > Look. If you already have a `keys.json`, merge `dg-workbench-layout/keys.json` into it by hand. `setup/` and `tools/sync-layout.sh` keep that folder in step with the dotfiles repo, which owns the layout.
-
-### The Tasks scheduler (`tools/tasks`)
-
-The `dg-tasks` mod is only the panel. Scheduled tasks run in `herdr-tasks`, a small program in this repo (TypeScript on [bun](https://bun.sh)). `./install.sh` links it to `~/.local/bin/herdr-tasks` and installs it as a login service (systemd user unit on Linux, launchd agent on macOS). Without it the panel still lists and runs scripts, but shows "Scheduler stopped" and scheduled tasks never run.
+`dg-tasks` is only the panel. Scheduled tasks run in `herdr-tasks`, a small [bun](https://bun.sh) program in `tools/tasks`. `./install.sh` links it to `~/.local/bin/herdr-tasks` and installs it as a login service (systemd user unit on Linux, launchd agent on macOS). Without it the panel still lists and runs scripts, but shows "Scheduler stopped" and scheduled tasks never run.
 
 ```sh
 herdr-tasks service status   # is the scheduler running?
-herdr-tasks daemon           # run it by hand, if the service could not be installed
-cd tools/tasks && bun test
+herdr-tasks daemon           # run it by hand if the service could not be installed
 ```
 
-Mods work together through shared state; each recipe lists what it assumes.
-Eight are modified forks of Herdr's own mods (Apache-2.0, see [NOTICE](NOTICE)).
+## Repository layout
 
-| Mod | What it is |
-|---|---|
-| `dg-agents` | A sidebar list of every running agent, grouped by space or sorted by urgency (Needs you, Done, Working, Idle). |
-| `dg-changes` | A Git changes sidebar for the active space. |
-| `dg-desktop-toast` | A replacement for Herdr's notification toast. |
-| `dg-file-picker` | A popup that drops from the top of the window (Ctrl+P) with a search box and a list of files in the active space's folder. |
-| `dg-files` | A side panel that lists the folder you are working in as a lazy file tree. |
-| `dg-file-view` | A tab that opens one file and shows it the right way: an editable code view with find, a rendered Markdown preview, an SVG/image viewer, an audio player with waveform, a video poster with a storyboard, a PDF page viewer with text search, a git diff view, or an "Open with" screen that lists desktop apps for files it cannot show. |
-| `dg-inbox` | One ranked list of everything that needs you, in a right-hand panel: agents that are blocked or finished, pull-request alerts, scheduled task runs, and "ask cards" that let you answer a waiting agent right from the list. |
-| `dg-loadout` | A side-panel inventory of everything an AI coding setup has configured for the folder you are working in: skills, MCP servers and installed plugins, across Claude, Antigravity, Codex and Gemini. |
-| `dg-new-menu` | A small popup that opens from the "+" button in the tab bar. |
-| `dg-new-tab` | A small centered dialog that opens when you want a new tab. |
-| `dg-prs` | A right-docked panel that lists your open GitHub and Bitbucket Cloud pull requests across profiles (for example Personal and Work). |
-| `dg-settings` | A 900x640 modal dialog that replaces Herdr's native Settings with one that has a left nav and a scrolling body. |
-| `dg-spaces` | The sidebar's list of spaces, rebuilt around folders and profiles. |
-| `dg-tabs` | A top tab bar for Herdr's window. |
-| `dg-tasks` | A side panel for the folder you are working in. |
-| `dg-workspace-chrome` | The thin strip at the top of the Herdr sidebar and the Settings / Add machine footer at the bottom of it. |
-| `dg-status-bar` | A status bar along the bottom of the window (a chrome-colored strip with a top border). |
-
-The git diff view in `dg-file-view` (word highlight, split layout, hunk folding and hunk staging) is adapted from herdr-powertools (Apache-2.0); see [NOTICE](NOTICE).
-
-License: Apache-2.0.
+```
+dg-inbox/
+  mods/dg-inbox/   main.js, mod.json, ...
+  tests/           the mod's tests
+  README.md        what it does
+  RECIPE.md        brief an agent can rebuild it from
+  preview.png
+tools/             Tasks scheduler, fork checks, preview tooling (not mods)
+install.sh
+```
 
 ## Keeping forks in sync
 
-Eight mods are forks of mods shipped with Herdr (`forks.json`). After a Herdr update:
+`forks.json` lists the mods forked from Herdr's own. After a Herdr update:
 
 ```sh
-tools/check-forks.sh                 # lists forks whose upstream mod changed
+tools/check-forks.sh                 # forks whose upstream mod changed
 # diff ~/.config/herdr-app/mods/<upstream>/main.js against <fork>/mods/<fork>/main.js, merge, then:
 tools/check-forks.sh --sync <fork>   # or: --sync all
 ```
@@ -93,10 +143,10 @@ tools/check-forks.sh --sync <fork>   # or: --sync all
 ## Development
 
 ```sh
-bun test */tests/                                    # JS tests (of every mod, or one: bun test inbox/tests)
-uv run --with pytest pytest prs-panel/tests file-view/tests   # Python tests
-herdr-app check <name>/mods/<name>                    # load a mod once
-uv run tools/crop.py <mod> shot.png                   # crop a full-window shot into <name>/preview.png
+bun test */tests/                      # JS tests, of every mod (or one: bun test dg-inbox/tests)
+cd tools/tasks && bun test             # scheduler tests
+herdr-app check <name>/mods/<name>     # load a mod once
+uv run tools/crop.py <mod> shot.png    # crop a full-window shot into <name>/preview.png
 ```
 
 ### Previews without real data
@@ -110,3 +160,6 @@ tools/demo/populate.sh   # mock spaces, tabs and agents
 tools/demo/shoot.sh      # shoot and crop every preview (or: shoot.sh <mod>...)
 ```
 
+## License
+
+Apache-2.0. See [LICENSE](LICENSE) and [NOTICE](NOTICE).
