@@ -3,9 +3,9 @@ import { View, div, svg, list, image } from "gpui-kit";
 import { v_flex, h_flex, Editor, EditorState, TextView, Scrollbar, v_virtual_list, Input, InputState, SliderState, ScrollHandle, VirtualListScrollHandle } from "gpui-base";
 import { props, shared, setShared, spaces, panes, focused, run, exec, readTextFile, writeTextFile, watchFolder, theme, settings, home, checking, notify } from "herdr";
 import { colorRows, languageByTag, languageOf, tokenize } from "./syntax.js";
-import { parse, added, unified } from "./diff-model.js";
+import { parse, added, unified, split, widest } from "./diff-model.js";
 import { words, markTokens, newBudget } from "./diff-words.js";
-import { layoutUnified, colsFor, DIFF_LINE_H } from "./diff-layout.js";
+import { layoutUnified, layoutSplit, colsFor, pickLayout, DIFF_LINE_H } from "./diff-layout.js";
 import { inspectFile, launchApp, setDefaultApp, revealInFolder, visibleApps, renderOpenWithScreen } from "./open-with-ui.js";
 import {
   AUDIO_RATES,
@@ -51,18 +51,80 @@ function shortRoot(root) {
   return root === h ? "~" : root.startsWith(h + "/") ? "~" + root.slice(h.length) : root;
 }
 
-// Colours (syntax tokens) and word marks for diff rows. Tokens live on the shared line objects, so each line is
-// tokenised once per build; word marks are computed once per line (line.marks) against its +/- pair, within the
-// per-file budget. row.tokens is what diff-layout wraps and the row renderer draws.
+// Diff layout mode ("unified" | "split" | "auto"), kept in localStorage and shared by every view of this mod.
+const DIFF_MODE_KEY = "dg-file-view.diffLayout";
+const DIFF_MODES = ["unified", "split", "auto"];
+let diffMode = (() => {
+  try {
+    const v = localStorage.getItem(DIFF_MODE_KEY);
+    return DIFF_MODES.includes(v) ? v : "auto";
+  } catch {
+    return "auto";
+  }
+})();
+function setDiffMode(mode) {
+  if (!DIFF_MODES.includes(mode)) return;
+  diffMode = mode;
+  try { localStorage.setItem(DIFF_MODE_KEY, mode); } catch {}
+}
+
+// Colours (syntax tokens) and word marks for diff rows (unified rows, or split rows with a left and a right side).
+// Tokens live on the shared line objects, so each line is tokenised once per build; word marks are computed once
+// per line (line.marks) against its +/- pair, within the per-file budget, and reused by both layouts. The tokens
+// the renderer draws are row.tokens (unified) or side.tokens (split).
 function prepareDiffRows(rows, path, budget) {
-  colorRows(rows.map((row) => row.line ?? row), path);
+  const isSplit = (row) => "left" in row || "right" in row;
+  const lines = [], seen = new Set();
   for (const row of rows) {
-    const line = row.line;
-    if (!line) continue;
-    if (line.marks === undefined) line.marks = (row.kind === "+" || row.kind === "-") && row.pair ? words(line.text, row.pair.text, budget) : null;
-    row.tokens = markTokens(line.tokens, line.marks, line.text);
+    for (const item of isSplit(row) ? [row.left, row.right] : [row]) {
+      const line = item ? item.line ?? item : null;
+      if (line && !seen.has(line)) { seen.add(line); lines.push(line); }
+    }
+  }
+  colorRows(lines, path);
+  for (const row of rows) {
+    for (const item of isSplit(row) ? [row.left, row.right] : [row]) {
+      const line = item?.line;
+      if (!line) continue;
+      if (line.marks === undefined) line.marks = (item.kind === "+" || item.kind === "-") && item.pair ? words(line.text, item.pair.text, budget) : null;
+      item.tokens = markTokens(line.tokens, line.marks, line.text);
+    }
   }
   return rows;
+}
+
+// Colours of a diff row: syntax tone per token kind, row tint (diffTint setting, 0-30 %) and the stronger tint of
+// changed words, per +/- kind (null for other kinds).
+function diffPalette(t) {
+  const pct = Number(shared("files-tabs.settings")?.diffTint);
+  const tint = Number.isFinite(pct) ? Math.min(30, Math.max(0, pct)) : 10;
+  const hex = (p) => Math.round((p / 100) * 255).toString(16).padStart(2, "0");
+  const base = (kind) => (kind === "+" ? t.ansi2 : kind === "-" ? t.ansi1 : null);
+  const alpha = hex(tint), markAlpha = hex(Math.min(60, 3 * tint));
+  return {
+    tone: { keyword: t.ansi5, string: t.ansi2, comment: t.dim, function: t.ansi4, type: t.ansi3, number: t.ansi6, constant: t.ansi6 },
+    base,
+    tint: (kind) => (base(kind) ? base(kind) + alpha : null),
+    mark: (kind) => (base(kind) ? base(kind) + markAlpha : null),
+  };
+}
+
+// Wrapped display lines (arrays of {kind, text, marked}) as a column of one-line rows.
+function diffLines(lines, kind, t, pal) {
+  const mark = pal.mark(kind);
+  return v_flex().flex_1().min_w(0).children(
+    lines.map((segs) =>
+      h_flex().h(DIFF_LINE_H).flex_none().overflow_hidden().whitespace_nowrap().children(
+        segs.map((k) =>
+          div()
+            .flex_none()
+            .text_color(kind === "@" ? t.dim : pal.tone[k.kind] ?? t.foreground)
+            .when(k.marked && mark, (e) => e.bg(mark))
+            .child(k.text),
+        ),
+      ),
+    ),
+  );
 }
 
 // The preview's renderer has no <details>, footnotes or definition lists: turn them into plain Markdown it
@@ -391,6 +453,10 @@ export default class FileView extends View {
     this.diffPath = null;
     this.diffExpanded = new Map();
     this.diffBudget = null;
+    this.diffMessage = null;
+    this.diffWidest = 0;
+    this.diffRowsLayout = "unified"; // layout this.rows were built for
+    this.diffWidth = 0; // last measured viewport width (0 until measured)
     this.error = null;
     this.loading = false;
     this.watched = null;
@@ -750,10 +816,24 @@ export default class FileView extends View {
     return this.mode ?? slot?.kind ?? "file";
   }
 
-  // Rebuilds the unified rows from the parsed diff. Bumping diffVersion changes the list id, so the virtual
-  // list never sees a sizes array of a different length.
+  // The layout the current diff is drawn in. Auto waits for a measured width (Unified until then) so it does not
+  // flip while the pane settles; one-sided diffs (new/deleted file) and note rows are always unified.
+  resolveDiffLayout() {
+    const doc = this.diffDoc;
+    if (!doc || this.diffMessage) return "unified";
+    const w = this.diffWidth;
+    return pickLayout(diffMode, w > 0 ? colsFor(w, "unified") : 0, { newFile: doc.newFile, deletedFile: doc.deletedFile, widest: this.diffWidest });
+  }
+
+  // Rebuilds the rows (unified or split) from the parsed diff. Bumping diffVersion changes the list id, so the
+  // virtual list never sees a sizes array of a different length.
   buildDiffRows() {
-    this.rows = this.diffDoc ? prepareDiffRows(unified(this.diffDoc, this.diffExpanded), this.diffPath, this.diffBudget) : [];
+    const layout = this.resolveDiffLayout();
+    let rows = [];
+    if (this.diffMessage) rows = [{ kind: "", text: this.diffMessage }];
+    else if (this.diffDoc) rows = prepareDiffRows((layout === "split" ? split : unified)(this.diffDoc, this.diffExpanded), this.diffPath, this.diffBudget);
+    this.rows = rows;
+    this.diffRowsLayout = layout;
     this.diffVersion = (this.diffVersion ?? 0) + 1;
     this.diffLayout = null;
   }
@@ -762,6 +842,8 @@ export default class FileView extends View {
     this.diffDoc = null;
     this.diffRaw = null;
     this.diffKey = null;
+    this.diffMessage = null;
+    this.diffWidest = 0;
     this.diffExpanded = new Map();
     this.buildDiffRows();
   }
@@ -773,10 +855,11 @@ export default class FileView extends View {
     this.diffRaw = raw;
     this.diffKey = key;
     this.diffPath = path;
+    this.diffMessage = message;
+    this.diffWidest = doc ? widest(doc) : 0;
     this.diffExpanded = new Map();
     this.diffBudget = newBudget();
     this.buildDiffRows();
-    if (message) this.rows = [{ kind: "", text: message }];
   }
 
   fetchOpenWithData(fullPath, seq, cx, { focusInput = false } = {}) {
@@ -2284,31 +2367,11 @@ export default class FileView extends View {
     this.pdfPageSlider = null;
   }
 
-  unifiedRow(row, wrapped, t) {
+  unifiedRow(row, wrapped, t, pal) {
     const { kind } = row;
     if (kind === "gap") return h_flex().w_full().h(DIFF_LINE_H + 2).flex_none();
     const number = kind === "-" ? row.old : kind === "+" || kind === " " ? row.next : undefined;
-    const pct = Number(shared("files-tabs.settings")?.diffTint);
-    const tint = Number.isFinite(pct) ? Math.min(30, Math.max(0, pct)) : 10;
-    const hex = (p) => Math.round((p / 100) * 255).toString(16).padStart(2, "0");
-    const alpha = hex(tint);
-    // Changed words get a stronger background than the row tint.
-    const markAlpha = hex(Math.min(60, 3 * tint));
-    const mark = kind === "+" ? t.ansi2 + markAlpha : t.ansi1 + markAlpha;
-    const tone = { keyword: t.ansi5, string: t.ansi2, comment: t.dim, function: t.ansi4, type: t.ansi3, number: t.ansi6, constant: t.ansi6 };
-    const body = v_flex().flex_1().min_w(0).children(
-      wrapped.map((segs) =>
-        h_flex().h(DIFF_LINE_H).flex_none().overflow_hidden().whitespace_nowrap().children(
-          segs.map((k) =>
-            div()
-              .flex_none()
-              .text_color(kind === "@" ? t.dim : tone[k.kind] ?? t.foreground)
-              .when(k.marked && (kind === "+" || kind === "-"), (e) => e.bg(mark))
-              .child(k.text),
-          ),
-        ),
-      ),
-    );
+    const body = diffLines(wrapped, kind, t, pal);
     if (kind === "@") return h_flex().w_full().px(14).py(1).flex_none().bg(t.raised).child(body);
     return h_flex()
       .w_full()
@@ -2317,21 +2380,50 @@ export default class FileView extends View {
       .items_start()
       .gap(12)
       .px(8)
-      .when(kind === "+", (e) => e.bg(t.ansi2 + alpha))
-      .when(kind === "-", (e) => e.bg(t.ansi1 + alpha))
+      .when(pal.tint(kind), (e) => e.bg(pal.tint(kind)))
       .child(div().w(36).h(DIFF_LINE_H).flex_none().text_right().text_color(t.dim).child(number === undefined ? "" : String(number)))
-      .child(div().w(12).h(DIFF_LINE_H).flex_none().text_color(kind === "+" ? t.ansi2 : kind === "-" ? t.ansi1 : t.dim).child(kind || " "))
+      .child(div().w(12).h(DIFF_LINE_H).flex_none().text_color(pal.base(kind) ?? t.dim).child(kind || " "))
       .child(body);
   }
 
+  // Side by side: two halves, each with its own number gutter, kind marker and wrapped lines. A side with no line is
+  // a raised filler; hunk, gap and note rows have no left/right and are drawn full width like in unified.
+  splitRow(row, wrapped, t, pal) {
+    if (wrapped.full) return this.unifiedRow(row, wrapped.left, t, pal);
+    const height = Math.max(wrapped.left.length, wrapped.right.length, 1) * DIFF_LINE_H + 2;
+    const half = (side, lines) => {
+      const box = h_flex().flex_1().min_w(0).h(height).flex_none().overflow_hidden();
+      if (!side) return box.bg(t.raised);
+      return box
+        .py(1)
+        .px(4)
+        .gap(8)
+        .items_start()
+        .when(pal.tint(side.kind), (e) => e.bg(pal.tint(side.kind)))
+        .child(div().w(36).h(DIFF_LINE_H).flex_none().text_right().text_color(t.dim).child(String(side.n)))
+        .child(div().w(12).h(DIFF_LINE_H).flex_none().text_color(pal.base(side.kind) ?? t.dim).child(side.kind))
+        .child(diffLines(lines, side.kind, t, pal));
+    };
+    return h_flex()
+      .w_full()
+      .h(height)
+      .flex_none()
+      .child(half(row.left, wrapped.left))
+      .child(div().w(1).h(height).flex_none().bg(t.border))
+      .child(half(row.right, wrapped.right));
+  }
+
   // Wrapped lines and row heights for the pane's current width (monospace 12.5px ≈ 7.6px per character).
-  // The cache key is (cols, rows, layout); every recompute bumps diffVersion, which is part of the list id.
+  // Rows are rebuilt when the resolved layout changes. The cache key is (cols, rows, layout); every recompute
+  // bumps diffVersion, which is part of the list id.
   diffLayoutFor(cx) {
     const width = this.diffScroll?.viewport_size()?.width ?? 0;
-    const layout = "unified";
+    if (width > 0) this.diffWidth = width;
+    if (this.resolveDiffLayout() !== this.diffRowsLayout) this.buildDiffRows();
+    const layout = this.diffRowsLayout;
     const cols = colsFor(width, layout);
     if (this.diffLayout?.cols !== cols || this.diffLayout.rows !== this.rows || this.diffLayout.layout !== layout) {
-      this.diffLayout = { cols, layout, rows: this.rows, ...layoutUnified(this.rows, cols) };
+      this.diffLayout = { cols, layout, rows: this.rows, ...(layout === "split" ? layoutSplit(this.rows, cols) : layoutUnified(this.rows, cols)) };
       this.diffVersion = (this.diffVersion ?? 0) + 1;
     }
     if (width === 0 && !this.diffMeasure) {
@@ -2339,6 +2431,16 @@ export default class FileView extends View {
       setTimeout(() => { this.diffMeasure = false; cx.notify(); }, 50);
     }
     return this.diffLayout;
+  }
+
+  // `s`: Split <-> Unified. On Auto it picks the opposite of what is shown. No-op for one-sided diffs.
+  toggleDiffLayout(cx) {
+    const doc = this.diffDoc;
+    if (!doc || this.diffMessage || doc.newFile || doc.deletedFile) return false;
+    const shown = diffMode === "auto" ? this.diffRowsLayout : diffMode;
+    setDiffMode(shown === "split" ? "unified" : "split");
+    cx.notify();
+    return true;
   }
 
   render(cx) {
@@ -2427,6 +2529,18 @@ export default class FileView extends View {
         ) {
           this.save(cx);
           cx.stop_propagation();
+          return;
+        }
+        if (
+          k === "s" &&
+          mode === "diff" &&
+          !showingOpenWith &&
+          !e.modifiers?.control &&
+          !e.modifiers?.platform &&
+          !e.modifiers?.alt &&
+          !e.modifiers?.shift
+        ) {
+          if (this.toggleDiffLayout(cx)) cx.stop_propagation();
           return;
         }
         if (mode === "file" && !showingOpenWith && !this.mediaMode && this.code) {
@@ -2606,6 +2720,25 @@ export default class FileView extends View {
                 .border_color(t.border)
                 .child(chip("fv-mode-diff", "Diff", mode === "diff", (_e, cx) => this.switchMode("diff", cx)))
                 .child(chip("fv-mode-file", "File", mode === "file", (_e, cx) => this.switchMode("file", cx))),
+            ),
+          )
+          .when(mode === "diff" && !showingOpenWith, (el) =>
+            el.child(
+              h_flex()
+                .gap(2)
+                .p(2)
+                .rounded(6)
+                .bg(t.background)
+                .border(1)
+                .border_color(t.border)
+                .children(
+                  DIFF_MODES.map((m) =>
+                    chip(`fv-layout-${m}`, m[0].toUpperCase() + m.slice(1), diffMode === m, (_e, cx) => {
+                      setDiffMode(m);
+                      cx.notify();
+                    }),
+                  ),
+                ),
             ),
           )
           .when(isMd, (el) =>
@@ -2872,6 +3005,8 @@ export default class FileView extends View {
                 .child(
                   (() => {
                     const lay = this.diffLayoutFor(cx);
+                    const pal = diffPalette(t);
+                    const rowFn = lay.layout === "split" ? "splitRow" : "unifiedRow";
                     return v_virtual_list(
                       `fv-diff-${this.slotId}-${this.diffVersion}`,
                       this.rows.length,
@@ -2879,7 +3014,7 @@ export default class FileView extends View {
                       (i) => `${this.diffVersion}-${i}`,
                       (range) => {
                         const out = [];
-                        for (let i = range.start; i < range.end; i++) out.push(this.unifiedRow(this.rows[i], lay.wrapped[i], t));
+                        for (let i = range.start; i < range.end; i++) out.push(this[rowFn](this.rows[i], lay.wrapped[i], t, pal));
                         return out;
                       },
                     )
