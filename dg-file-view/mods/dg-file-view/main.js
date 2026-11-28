@@ -3,7 +3,8 @@ import { View, div, svg, list, image } from "gpui-kit";
 import { v_flex, h_flex, Editor, EditorState, TextView, Scrollbar, v_virtual_list, Input, InputState, SliderState, ScrollHandle, VirtualListScrollHandle } from "gpui-base";
 import { props, shared, setShared, spaces, panes, focused, run, exec, readTextFile, writeTextFile, watchFolder, theme, settings, home, checking, notify } from "herdr";
 import { colorRows, languageByTag, languageOf, tokenize } from "./syntax.js";
-import { parse, added, unified, split, widest } from "./diff-model.js";
+import { parse, added, unified, split, widest, hunkPatch } from "./diff-model.js";
+import { guard, applyArgs } from "./git-guard.js";
 import { words, markTokens, newBudget } from "./diff-words.js";
 import { layoutUnified, layoutSplit, colsFor, pickLayout, DIFF_LINE_H } from "./diff-layout.js";
 import { inspectFile, launchApp, setDefaultApp, revealInFolder, visibleApps, renderOpenWithScreen } from "./open-with-ui.js";
@@ -43,6 +44,8 @@ const GAP_LINES = 80, EXPANDED_LINES = 640;
 const READ_CONTEXT = `git cat-file blob "$1" | LC_ALL=C awk -v first="$2" -v last="$3" 'NR >= first {print substr($0, 1, 8004)} NR == last {exit}'`;
 // Line count of the new side when it is the index (a staged diff): args: path.
 const COUNT_INDEX = `git cat-file blob ":$1" | awk 'END {print NR}'`;
+// Checkouts (keyed by on + root) with a hunk being staged or unstaged: one apply at a time per checkout.
+const staging = new Set();
 
 function joinPath(root, rel) {
   if (!root) return rel;
@@ -466,6 +469,10 @@ export default class FileView extends View {
     this.diffRepo = null; // {root, on} of the checkout the shown diff came from (expand reads blobs there)
     this.gapBusy = null; // {doc, hunk} while unchanged lines are being read
     this.diffNotice = null; // error strip under the diff (dismiss by clicking it)
+    this.diffPendingNotice = null; // notice to show once the next diff is set (setDiff clears diffNotice)
+    // Staging of the shown diff, or null when it offers none: {stage: "changes"|"staged", args (the git diff args
+    // load() used), expect (guard: root, branch, HEAD at load), patches (hunkPatch per hunk, null = no button)}.
+    this.diffStage = null;
     this.error = null;
     this.loading = false;
     this.watched = null;
@@ -855,6 +862,8 @@ export default class FileView extends View {
     this.diffWidest = 0;
     this.diffExpanded = new Map();
     this.diffNotice = null;
+    this.diffPendingNotice = null;
+    this.diffStage = null;
     this.buildDiffRows();
   }
 
@@ -868,7 +877,9 @@ export default class FileView extends View {
     this.diffMessage = message;
     this.diffWidest = doc ? widest(doc) : 0;
     this.diffExpanded = new Map();
-    this.diffNotice = null;
+    this.diffNotice = this.diffPendingNotice;
+    this.diffPendingNotice = null;
+    this.diffStage = null;
     this.diffBudget = newBudget();
     this.buildDiffRows();
   }
@@ -1091,7 +1102,7 @@ export default class FileView extends View {
           const fresh = xy === "??" || (head.code !== 0 && xy.includes("A"));
 
           const key = `${fullPath}\0${slot.stage ?? ""}\0${fresh}\0${this.diffWhole}`;
-          let raw, doc = null, message = null;
+          let raw, doc = null, message = null, diffArgs = null;
           if (fresh) {
             const text = await readTextFile(fullPath, { on }).catch(() => null);
             if (seq !== this.loadSeq) return;
@@ -1101,7 +1112,8 @@ export default class FileView extends View {
             else if (!text) message = "Empty file";
             else doc = added(text.slice(0, MAX_CHARS));
           } else {
-            const r = await git(["--literal-pathspecs", "diff", "--full-index", "--src-prefix=a/", "--dst-prefix=b/", "--no-renames", ...(this.diffWhole ? ["-U100000"] : []), ...(slot.stage === "staged" ? ["--cached"] : slot.stage === "changes" ? [] : head.code === 0 ? ["HEAD"] : []), "--no-ext-diff", "--no-textconv", "--no-color", "--", relFromGit]);
+            diffArgs = ["--literal-pathspecs", "diff", "--full-index", "--src-prefix=a/", "--dst-prefix=b/", "--no-renames", ...(this.diffWhole ? ["-U100000"] : []), ...(slot.stage === "staged" ? ["--cached"] : slot.stage === "changes" ? [] : head.code === 0 ? ["HEAD"] : []), "--no-ext-diff", "--no-textconv", "--no-color", "--", relFromGit];
+            const r = await git(diffArgs);
             if (seq !== this.loadSeq) return;
             if (r.code !== 0) throw new Error(r.stderr || "git diff failed");
             raw = r.stdout;
@@ -1111,8 +1123,28 @@ export default class FileView extends View {
               if (entry) message = "Binary file changed or no text diff available";
             }
           }
-          // Same diff as the one shown: keep the rows (and the scroll position) as they are.
-          if (key === this.diffKey && raw === this.diffRaw && this.rows.length) return;
+          // Stage/unstage hunk: only the Changes/Staged views (not `git diff HEAD`), not whole-file mode, not a
+          // fresh (untracked) file. guard() refuses later if the checkout, branch or HEAD moved since now.
+          let stageInfo = null;
+          if (doc && diffArgs && !this.diffWhole && !fresh && (slot.stage === "changes" || slot.stage === "staged")) {
+            const ref = await git(["symbolic-ref", "-q", "HEAD"]);
+            if (seq !== this.loadSeq) return;
+            stageInfo = {
+              stage: slot.stage,
+              args: diffArgs,
+              expect: {
+                root: gitRoot,
+                branch: ref.code === 0 ? ref.stdout.trim().replace(/^refs\/heads\//, "") : null,
+                refs: [["HEAD", head.code === 0 ? head.stdout.trim() : null]],
+              },
+            };
+          }
+          // Same diff as the one shown: keep the rows (and the scroll position) as they are; only what the
+          // guard expects is refreshed (a commit elsewhere moves HEAD without changing this diff).
+          if (key === this.diffKey && raw === this.diffRaw && this.rows.length) {
+            if (this.diffStage && stageInfo) this.diffStage.expect = stageInfo.expect;
+            return;
+          }
           // Length of the new file, so the gap after the last hunk can be offered (not for whole-file mode, a
           // cut diff, or a file with no old blob to read the lines from). Skipped when it cannot be read.
           if (doc && !this.diffWhole && !fresh && doc.oldBlob && !doc.cut && !doc.newFile && !doc.deletedFile) {
@@ -1127,6 +1159,10 @@ export default class FileView extends View {
           this.diffRepo = { root: gitRoot, on };
           if (doc || message) this.setDiff(doc, raw, key, relFromGit, message);
           else this.clearDiff();
+          if (doc && stageInfo) {
+            const patches = doc.hunks.map((_, i) => hunkPatch(doc, i));
+            if (patches.some(Boolean)) this.diffStage = { ...stageInfo, patches };
+          }
           if (this.rows.length === 0) this.error = "No uncommitted changes for this file";
           return;
         }
@@ -2397,7 +2433,44 @@ export default class FileView extends View {
     if (dash < 0 || Number(String(key).slice(0, dash)) !== this.diffVersion) return;
     const row = this.rows[Number(String(key).slice(dash + 1))];
     if (row?.kind === "gap") this.expandGap(row, cx);
-    // T8: else if (row?.kind === "@") this.stageHunk(row.hunk, cx);
+    else if (row?.kind === "@") this.stageHunk(row.hunk, cx);
+  }
+
+  // Stages (Changes view) or unstages (Staged view, --reverse) one hunk. Refuses while a rebase/merge is under way
+  // or after the checkout, branch or HEAD moved (guard), and when the diff on disk is no longer the one shown.
+  // The patch goes through `sh -c APPLY` as an argument (exec has no stdin). Reloads afterwards.
+  stageHunk(index, cx) {
+    const doc = this.diffDoc, raw = this.diffRaw, st = this.diffStage, repo = this.diffRepo, slot = this.slot();
+    const patch = st?.patches[index];
+    if (!doc || !st || !repo || !patch || this.diffWhole || !slot) return;
+    const lock = JSON.stringify([repo.on, repo.root]);
+    if (staging.has(lock)) { this.diffNotice = "A hunk is already being staged in this checkout"; cx.notify(); return; }
+    const run = (cmd, args) => exec(cmd, args, { cwd: repo.root, on: repo.on });
+    const git = (args) => run("git", [...READ, ...args]);
+    staging.add(lock);
+    this.diffNotice = null;
+    cx.notify();
+    cx.spawn(async (cx) => {
+      let reload = false;
+      try {
+        const why = await guard(run, git, st.expect);
+        if (why) throw new Error(why);
+        const now = await git(st.args);
+        if (now.code !== 0 || now.stdout !== raw) { reload = true; throw new Error("File changed, try again"); }
+        const r = await run("sh", applyArgs(patch, st.stage === "staged"));
+        if (r.code !== 0) throw new Error(r.stderr?.trim() || "Git could not apply the hunk to the index");
+        reload = true;
+      } catch (e) {
+        if (this.diffDoc === doc) {
+          if (reload) this.diffPendingNotice = String(e?.message ?? e);
+          else this.diffNotice = String(e?.message ?? e);
+        }
+      } finally {
+        staging.delete(lock);
+        if (reload && this.diffDoc === doc) this.load(this.slot(), cx);
+        cx.notify();
+      }
+    });
   }
 
   // Shows 80 more unchanged lines of a gap (read from the old blob, from the gap's start on, 640 at most per
@@ -2470,7 +2543,34 @@ export default class FileView extends View {
     }
     const number = kind === "-" ? row.old : kind === "+" || kind === " " ? row.next : undefined;
     const body = diffLines(wrapped, kind, t, pal);
-    if (kind === "@") return h_flex().w_full().px(14).py(1).flex_none().bg(t.raised).child(body);
+    if (kind === "@") {
+      const st = this.diffStage, repo = this.diffRepo;
+      const can = Boolean(st?.patches[row.hunk]) && !this.diffWhole && this.diffDoc && !this.diffDoc.cut;
+      const busy = can && repo && staging.has(JSON.stringify([repo.on, repo.root]));
+      return h_flex()
+        .w_full()
+        .px(14)
+        .py(1)
+        .gap(8)
+        .items_start()
+        .flex_none()
+        .bg(t.raised)
+        .when(can, (e) => e.cursor_pointer())
+        .child(body)
+        .when(can, (e) =>
+          e.child(
+            div()
+              .flex_none()
+              .h(DIFF_LINE_H)
+              .px(6)
+              .rounded(4)
+              .text_size(11)
+              .bg(t.chrome)
+              .text_color(busy ? t.dim : t.accent)
+              .child(busy ? "Applying…" : st.stage === "staged" ? "Unstage hunk" : "Stage hunk"),
+          ),
+        );
+    }
     return h_flex()
       .w_full()
       .py(1)
