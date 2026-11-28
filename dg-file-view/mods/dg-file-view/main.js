@@ -380,6 +380,7 @@ export default class FileView extends View {
             path: p.path,
             root: p.root,
             on: p.on ?? null,
+            stage: p.stage ?? null,
             name: p.name ?? p.path.split(/[\\/]/).pop(),
             preview: p.preview ?? true,
             updatedAt: p.updatedAt ?? 0,
@@ -597,7 +598,7 @@ export default class FileView extends View {
   }
 
   slotKey(slot) {
-    return `${slot.kind}:${slot.root}:${slot.path}:${slot.on ?? ""}`;
+    return `${slot.kind}:${slot.root}:${slot.path}:${slot.on ?? ""}:${slot.stage ?? ""}`;
   }
 
   slot() {
@@ -996,7 +997,7 @@ export default class FileView extends View {
               lines = [`@@ -0,0 +1,${total} @@`, ...text.slice(0, MAX_CHARS).replace(/\n$/, "").split("\n").slice(0, 3000).map((l) => `+${l}`)];
             }
           } else {
-            const r = await git(["diff", ...(head.code === 0 ? ["HEAD"] : []), "--no-ext-diff", "--no-textconv", "--no-color", "--", relFromGit]);
+            const r = await git(["diff", ...(slot.stage === "staged" ? ["--cached"] : slot.stage === "changes" ? [] : head.code === 0 ? ["HEAD"] : []), "--no-ext-diff", "--no-textconv", "--no-color", "--", relFromGit]);
             if (seq !== this.loadSeq) return;
             if (r.code !== 0) throw new Error(r.stderr || "git diff failed");
             const all = r.stdout.replace(/\n$/, "").split("\n");

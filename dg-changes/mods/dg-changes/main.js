@@ -70,7 +70,7 @@ const key = () => JSON.stringify(location());
 const AUTO_FETCH_MS = 5 * 60 * 1000; // background `git fetch` so the ↓/↑ indicators stay current
 const READ = ["--no-optional-locks", "-c", "core.fsmonitor=false", "-c", "diff.autoRefreshIndex=false"];
 
-function openFileTab({ spaceId, kind, path, root, on, name, pin }) {
+function openFileTab({ spaceId, kind, path, root, on, name, pin, stage = null }) {
   if (!spaceId || !root || !path) return;
   const slots = { ...(shared("file-view.slots") ?? {}) };
   const allSpaces = spaces();
@@ -94,7 +94,7 @@ function openFileTab({ spaceId, kind, path, root, on, name, pin }) {
 
   const normOn = on ?? null;
   const existing = Object.values(slots).find(
-    (s) => isLiveInSpace(s) && s.root === root && s.path === path && s.kind === kind && (s.on ?? null) === normOn,
+    (s) => isLiveInSpace(s) && s.root === root && s.path === path && s.kind === kind && (s.on ?? null) === normOn && (s.stage ?? null) === stage,
   );
   if (existing) {
     if (pin && existing.preview) {
@@ -109,7 +109,7 @@ function openFileTab({ spaceId, kind, path, root, on, name, pin }) {
 
   const previewSlot = Object.values(slots).find((s) => isLiveInSpace(s) && s.preview);
   if (previewSlot) {
-    Object.assign(previewSlot, { kind, path, root, on: normOn, name, preview: !pin, updatedAt: now });
+    Object.assign(previewSlot, { kind, path, root, on: normOn, stage, name, preview: !pin, updatedAt: now });
     setShared("file-view.slots", slots);
     if (previewSlot.tabId) {
       run("tab.rename", { id: previewSlot.tabId, name });
@@ -119,7 +119,7 @@ function openFileTab({ spaceId, kind, path, root, on, name, pin }) {
   }
 
   const slotId = `fv-${now.toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
-  const entry = { spaceId, tabId: null, kind, path, root, on: normOn, name, preview: !pin, updatedAt: now };
+  const entry = { spaceId, tabId: null, kind, path, root, on: normOn, stage, name, preview: !pin, updatedAt: now };
   slots[slotId] = entry;
   setShared("file-view.slots", slots);
   run("tab.new", { name, space: spaceId, mod: "dg-file-view", props: { slotId, ...entry, beforeTabs: [...spaceTabIds] } });
@@ -133,7 +133,7 @@ function activeOpenDiff(spaceId, root, on) {
   const match = Object.values(slots).find(
     (s) => s?.tabId === activeTabId && s.root === root && s.kind === "diff" && (s.on ?? null) === (on ?? null),
   );
-  return match?.path ?? null;
+  return match ? { path: match.path, stage: match.stage ?? null } : null;
 }
 
 export default class ChangesTabs extends View {
@@ -376,14 +376,15 @@ export default class ChangesTabs extends View {
     });
   }
 
-  pick(r, path, pin) {
-    const name = path.split("/").pop() || path;
+  pick(r, path, pin, stage) {
+    const name = (path.split("/").pop() || path) + (stage === "staged" ? " (staged)" : "");
     openFileTab({
       spaceId: this.spaceId ?? spaces().find((s) => s.active)?.id,
       kind: "diff",
       path,
       root: r.root,
       on: this.on,
+      stage,
       name,
       pin,
     });
@@ -733,9 +734,9 @@ export default class ChangesTabs extends View {
             .items_center()
             .rounded(7)
             .cursor_pointer()
-            .when(activePath === f.path, (e) => e.bg(t.selected))
+            .when(activePath?.path === f.path && (activePath.stage ?? section) === section, (e) => e.bg(t.selected))
             .hover((s) => s.bg(t.hover))
-            .on_click((e) => this.pick(r, f.path, e.click_count >= 2))
+            .on_click((e) => this.pick(r, f.path, e.click_count >= 2, section))
             .on_mouse_down("right", (_e, cx) => {
               cx.stop_propagation();
               openOverlay({
